@@ -1,4 +1,4 @@
-Random App Name89940
+Philips Burndown App
 =========================
 
 ## Overview
