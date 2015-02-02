@@ -5,7 +5,7 @@
         extend: 'Rally.app.TimeboxScopedApp',
 
         settingsScope: 'project',
-        scopeTyle: 'release',
+        scopeType: 'release',
 
         requires: [
             'Rally.apps.charts.burndown.BurnDownSettings',
@@ -14,7 +14,8 @@
             'Rally.ui.combobox.IterationComboBox',
             'Rally.ui.combobox.ReleaseComboBox',
             'Rally.apps.charts.IntegrationHeaders',
-            'Rally.apps.charts.burndown.BurnDownChart'
+            'Rally.apps.charts.burndown.BurnDownChart',
+            'Rally.apps.iterationtrackingboard.StatsBanner'
         ],
 
         mixins: [
@@ -86,8 +87,42 @@
                 this.ignoreOnScopeChange = true;
                 this._getScopePicker().on('ready', this._loadScopePreference, this, {single: true});
             }
+            console.log("context in burndown: ", this.context.getTimeboxScope());            
+            this._addStatsBanner();
         },
 
+        _addStatsBanner: function() {
+            console.log("context in burndown: ", this.getContext().getTimeboxScope());
+            this.remove('statsBanner');
+            this.add({
+              xtype: 'statsbanner',
+              itemId: 'statsBanner',
+              context: this.getContext(),
+              margin: '0 0 5px 0',
+              listeners: {
+                resize: this._resizeGridBoardToFillSpace,
+                scope: this
+              }
+            });
+        },
+        
+        _resizeGridBoardToFillSpace: function() {
+            if(this.gridboard) {
+              this.gridboard.setHeight(this.getAvailableGridBoardHeight());
+            }
+          },
+
+          
+        getAvailableGridBoardHeight: function() {
+            var height = this.getHeight();
+            if(this.down('#statsBanner').rendered) {
+              height -= this.down('#statsBanner').getHeight();
+            }
+            return height;
+        },
+
+        
+        
         _addHelpComponent: function () {
             this.down('#header').add(this._buildHelpComponent());
         },

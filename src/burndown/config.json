@@ -11,6 +11,24 @@
       "../settings/SettingsChangeMixin.js",
       "../settings/DataTypePicker.js",
       "../settings/TimeboxPicker.js",
+      "../sbwidget/statsbanner/BannerWidget.js",
+      "../sbwidget/statsbanner/Gauge.js",
+      "../sbwidget/statsbanner/PlannedVelocity.js",
+      "../sbwidget/statsbanner/TimeboxEnd.js",
+      "../sbwidget/statsbanner/Defects.js",
+      "../sbwidget/statsbanner/Accepted.js",
+      "../sbwidget/statsbanner/Tasks.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/IterationProgressMixin.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/IterationProgressChart.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/BurndownChart.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/CumulativeFlowChart.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/PieChart.js",
+      "../sbwidget/statsbanner/iterationprogresscharts/MinimalPieChart.js",
+      "../sbwidget/statsbanner/IterationProgressDialogChartToggle.js",
+      "../sbwidget/statsbanner/IterationProgressDialog.js",
+      "../sbwidget/statsbanner/IterationProgress.js",
+      "../sbwidget/statsbanner/CollapseExpand.js",
+      "../sbwidget/StatsBanner.js",
       "BurnDownSettings.js",
       "BurnDownChart.js",
       "BurnDownApp.js",
@@ -18,6 +36,8 @@
       "ReleaseBurnDownApp.js"
    ],
    "css": [
+      "../sbwidget/RallyVariables.less",
+      "../sbwidget/StatsBanner.less",
       "../Charts.less"
    ]
 }

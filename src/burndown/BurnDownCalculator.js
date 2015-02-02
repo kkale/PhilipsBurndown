@@ -82,8 +82,6 @@
                 {
                     "as": "Ideal",
                     "f": function (row, index, summaryMetrics, seriesData) {
-                        console.log("summaryMetrics: ", summaryMetrics);
-                        console.log("summaryMetrics: ", seriesData);
                         var max = summaryMetrics.Scope_max,
                             increments = seriesData.length - 1,
                             incrementAmount;
@@ -94,15 +92,15 @@
                         return Math.floor(100 * (max - index * incrementAmount)) / 100;
                     },
                     "display": "line"
-                },
-                {
-                    "as": "Prediction",
-                    "f": function (row, index, summaryMetrics, seriesData) {
-                        return null;
-                    },
-                    "display": "line",
-                    "dashStyle": "Dash"
                 }
+//                {
+//                    "as": "Prediction",
+//                    "f": function (row, index, summaryMetrics, seriesData) {
+//                        return null;
+//                    },
+//                    "display": "line",
+//                    "dashStyle": "Dash"
+//                }
             ];
         },
 
@@ -185,17 +183,17 @@
                     this.projectionsConfig = undefined;
                 } else {
                 // DE18732, if the slope is up, truncate it at 1.25 of the max Ideal
-                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
-                    if (_.max(chartData.series[3].data) > predictionCeiling) {
-                        var i;
-                        var maxVal = predictionCeiling;
-                        for(i=0;i < chartData.series[3].data.length;i++) {
-                            if(chartData.series[3].data[i] > predictionCeiling) {
-                                chartData.series[3].data[i] = maxVal;
-                                maxVal = null;
-                            }
-                        }
-                    }
+//                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
+//                    if (_.max(chartData.series[3].data) > predictionCeiling) {
+//                        var i;
+//                        var maxVal = predictionCeiling;
+//                        for(i=0;i < chartData.series[3].data.length;i++) {
+//                            if(chartData.series[3].data[i] > predictionCeiling) {
+//                                chartData.series[3].data[i] = maxVal;
+//                                maxVal = null;
+//                            }
+//                        }
+//                    }
                 }
 
             }
