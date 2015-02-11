@@ -11,17 +11,17 @@
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Accepted</div>',
+            '<div class="stat-title">Accepted Stories</div>',
             '<div class="stat-metric">',
             '<div class="metric-chart"></div>',
             '<div class="metric-chart-text percent-offset">',
             '{percentage}<div class="metric-percent">%</div>',
             '</div>',
-            '<div class="metric-subtext">{accepted} of {total} {unit}</div>',
+            '<div class="metric-subtext">{accepted} of {total}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<div class="stat-title">Accepted</div>',
+            '<div class="stat-title">Accepted Stories</div>',
             '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],

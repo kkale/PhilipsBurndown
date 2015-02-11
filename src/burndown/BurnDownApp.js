@@ -63,6 +63,7 @@
         onScopeChange: function (scope) {
             if (!this.ignoreOnScopeChange) {
                 this._rebuildChartForScope(scope.getRecord().get('_ref'));
+
             }
         },
 
@@ -87,12 +88,9 @@
                 this.ignoreOnScopeChange = true;
                 this._getScopePicker().on('ready', this._loadScopePreference, this, {single: true});
             }
-            console.log("context in burndown: ", this.context.getTimeboxScope());            
-            this._addStatsBanner();
         },
 
         _addStatsBanner: function() {
-            console.log("context in burndown: ", this.getContext().getTimeboxScope());
             this.remove('statsBanner');
             this.add({
               xtype: 'statsbanner',
@@ -141,6 +139,7 @@
 
             this._saveScopePreference(scopeRef);
             this._loadScopeObject(scopeRef);
+            this._addStatsBanner();
         },
 
         _destroyChart: function () {

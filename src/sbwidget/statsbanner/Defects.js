@@ -22,12 +22,12 @@
             '<div class="stat-title">Defects</div>',
             '<div class="stat-metric">',
             '<div class="metric-icon icon-defect"></div>{activeCount}',
-            '<div class="stat-secondary">Active</div>',
+            '<div class="stat-secondary">Closed</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
             '<span class="metric-icon icon-defect"></span>',
-            '<div class="stat-title">Defects</div>',
+            '<div class="stat-title">Defects Closed</div>',
             '<div class="stat-metric">{activeCount}</div>',
             '</div>'
         ],
@@ -48,11 +48,11 @@
                 var defectSummary = record.get('Summary') && record.get('Summary').Defects;
                 if (defectSummary) {
                     _.each(defectSummary.State, function(count, state) {
-                        if (state !== 'Closed') {
+                        if (state == 'Closed') {
                             activeDefects += count;
                         }
                     }, this);
-                } else if(record.self.typePath === 'defect' && record.get('State') !== 'Closed') {
+                } else if(record.self.typePath === 'defect' && record.get('State') == 'Closed') {
                     activeDefects++;
                 }
             }, this);

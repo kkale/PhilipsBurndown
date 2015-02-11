@@ -11,7 +11,7 @@
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Planned Velocity</div>',
+            '<div class="stat-title">Completed Features</div>',
             '<div class="stat-metric">',
             '<div class="metric-chart"></div>',
             '<div class="metric-chart-text percent-offset">',
@@ -21,7 +21,7 @@
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<div class="stat-title">Planned Velocity</div>',
+            '<div class="stat-title">Completed Features</div>',
             '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
@@ -36,6 +36,7 @@
         },
 
         onDataChanged: function() {
+            console.log("Inside onDataChanged");
             this._getRenderData().then({
                 success: function(renderData){
                     this.update(renderData);
@@ -56,28 +57,29 @@
         },
 
         _getRenderData: function() {
+            console.log("Store: ", this.store);
+            console.log("Records: ", this.store.getRange());
             var deferred = Ext.create('Deft.Deferred');
-            var estimate = _.reduce(this.store.getRange(), function(accum, record) {
-                return accum + record.get('PlanEstimate') || 0;
-            }, 0);
-
-            estimate = Math.round(estimate * 100) / 100;
-
-            var timebox = this.getContext().getTimeboxScope();
-            var timeboxUnits = this._getTimeboxUnits();
-            timebox.getPlannedVelocity().then({
-                success: function(plannedVelocity){
-                    var percentage = plannedVelocity === 0 ? 0 : Math.round(estimate / plannedVelocity * 100);
-
-                    var data = {
-                        estimate: estimate,
-                        percentage: percentage,
-                        plannedVelocity: plannedVelocity,
-                        unit: timeboxUnits
-                    };
-                    deferred.resolve(data);
+            var allFeatures = _.filter(this.store.getRange(), function(record){
+                return record.get("_type") == "portfolioitem/feature";
+            } );            
+            var doneFeatures = _.reduce(allFeatures, function (total, feature){
+                if (feature.get("State") !== null && feature.get("State").get("Name") == "Done") {
+                    return total + 1;
                 }
-            });
+            }, 0); 
+
+            if ( isNaN(doneFeatures) ) {
+                doneFeatures = 0;
+            }
+            
+             var data = {
+                    estimate: doneFeatures,
+                    percentage: doneFeatures/allFeatures.length,
+                    plannedVelocity: allFeatures.length,
+                    unit: ''
+                };
+            deferred.resolve(data);
 
             return deferred.promise;
         },

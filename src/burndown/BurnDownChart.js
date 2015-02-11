@@ -32,7 +32,8 @@
                 calculatorConfig: {
                     timeZone: "GMT",
                     completedScheduleStateNames: null, // defaults hide problems
-                    enableProjections: true
+                    enableProjections: true,
+                    timebox: null
 
                     //chartAggregationType: ''
                 },

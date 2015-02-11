@@ -32,31 +32,32 @@
                 hideDelay: 0
             },
             userAction:'IterationProgressApp - User clicked pie chart'
-        },
-        {
-            cls: 'toggle center burndown',
-            iconCls: 'icon-bars',
-            frame: false,
-            toggleGroup: 'iterationprogressviewtoggle',
-            toolTipConfig: {
-                html: 'Burndown',
-                anchor: 'top',
-                hideDelay: 0
-            },
-            userAction:'IterationProgressApp - User clicked burndown'
-        },
-        {
-            cls: 'toggle rly-right cumulativeflow',
-            iconCls: 'icon-graph',
-            frame: false,
-            toggleGroup: 'iterationprogressviewtoggle',
-            toolTipConfig: {
-                html: 'Cumulative Flow',
-                anchor: 'top',
-                hideDelay: 0
-            },
-            userAction:'IterationProgressApp - User clicked CFD'
-        }],
+        }
+//        {
+//            cls: 'toggle center burndown',
+//            iconCls: 'icon-bars',
+//            frame: false,
+//            toggleGroup: 'iterationprogressviewtoggle',
+//            toolTipConfig: {
+//                html: 'Burndown',
+//                anchor: 'top',
+//                hideDelay: 0
+//            },
+//            userAction:'IterationProgressApp - User clicked burndown'
+//        },
+//        {
+//            cls: 'toggle rly-right cumulativeflow',
+//            iconCls: 'icon-graph',
+//            frame: false,
+//            toggleGroup: 'iterationprogressviewtoggle',
+//            toolTipConfig: {
+//                html: 'Cumulative Flow',
+//                anchor: 'top',
+//                hideDelay: 0
+//            },
+//            userAction:'IterationProgressApp - User clicked CFD'
+//        }
+        ],
 
         initComponent: function(config) {
             this.initConfig(config);

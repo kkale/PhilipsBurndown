@@ -66,11 +66,7 @@
                     'as': 'Scope_max',
                     'f': function(seriesData) {
                             var max = 0, i = 0;
-                            for (i=0;i<seriesData.length;i++) {
-                                if(seriesData[i].Accepted + seriesData[i]['To Do'] > max) {
-                                    max = seriesData[i].Accepted + seriesData[i]['To Do'];
-                                }
-                            }
+                            max = seriesData[seriesData.length-1]['To Do'];
                             return max;
                          }
                 }
@@ -93,14 +89,6 @@
                     },
                     "display": "line"
                 }
-//                {
-//                    "as": "Prediction",
-//                    "f": function (row, index, summaryMetrics, seriesData) {
-//                        return null;
-//                    },
-//                    "display": "line",
-//                    "dashStyle": "Dash"
-//                }
             ];
         },
 
@@ -111,7 +99,7 @@
             var timeboxEnd = Ext.Date.add(this.scopeEndDate, Ext.Date.DAY, -1);
             if(this.projectionsConfig === undefined) {
                 this.projectionsConfig = {
-                    doubleTimeboxEnd: doubleTimeboxEnd,
+                    doubleTimeboxEnd: timeboxEnd,
                     timeboxEnd: timeboxEnd,
 
                     series: [
@@ -215,9 +203,12 @@
              }
 
              var lastDate = Ext.Date.parse(chartData.categories[chartData.categories.length - 1], 'Y-m-d');
+             console.log("END DAte: ", endDate);
+             console.log("lastDate: ", lastDate);
              if(endDate > lastDate) {
                 // the scopeEndDate date wasn't found in the current categories...we need to extend categories to include it
                 // (honoring "workDays").
+                 console.log("last date is earlier, add more dates");
 
                 index = chartData.categories.length;
                 var dt = Ext.Date.add(lastDate, Ext.Date.DAY, 1);
@@ -233,6 +224,7 @@
                 index = chartData.categories.length - 1;
              } else {
                  // it is in "scope"...set index to the index of the last workday in scope
+                 console.log("last date is later");
                  index = this._indexOfDate(chartData, endDate);
                  if(index === -1) {
                     // it's in "scope", but falls on a non-workday...back up to the previous workday
@@ -246,12 +238,22 @@
                 return;
              }
              // set first and last point, and let connectNulls fill in the rest
-             var i;
              var seriesData = chartData.series[2].data;
-             for (i=1;i<index;i++) {
-                seriesData[i] = null;
+             var todoData = chartData.series[0].data;
+             console.log("todoData: ", todoData);
+             seriesData[0] = null;
+             
+             var tik = 0;             
+             while (todoData[++tik] !== null) { 
+                 console.log(tik, " : ", todoData[tik]);                 
+                 seriesData[tik] = null;
              }
-             seriesData[index] = 0;
+             console.log("tik: ", tik);
+             seriesData[tik-1] = todoData[tik-1];
+             
+             console.log("ideal data: ", seriesData);
+             
+             seriesData[seriesData.length-1] = 0;
         },
 
         _indexOfDate: function(chartData, date) {

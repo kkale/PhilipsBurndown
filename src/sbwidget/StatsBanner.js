@@ -28,6 +28,7 @@ var bannerme;
         width: '100%',
         stateful: true,
         stateEvents: ['expand', 'collapse'],
+        featureStore: undefined,
 
         config: {
             context: null,
@@ -78,31 +79,39 @@ var bannerme;
             this.subscribe(this, Rally.Message.objectCreate, this._update, this);
             this.subscribe(this, Rally.Message.objectUpdate, this._update, this);
             this.subscribe(this, Rally.Message.bulkUpdate, this._update, this);
-            this.subscribe(this, Rally.Message.bulkImport, this._update, this);
-            bannerme = this;
-            console.log("this.context : ", this.context);
-            console.log("this.context.getTimeboxScope() : ", this.context.getTimeboxScope());
-            
-            console.log("QueryFilter : ", this.context.getTimeboxScope().getQueryFilter());
-            console.log("QueryFilter BannerMe: ", bannerme.context.getTimeboxScope().getQueryFilter());
-            
+            this.subscribe(this, Rally.Message.bulkImport, this._update, this);            
 
             this.store = Ext.create('Rally.data.wsapi.artifact.Store', {
-                models: ['User Story', 'Defect', 'Defect Suite', 'Test Set'],
-                fetch: ['Defects:summary[State;ScheduleState+Blocked]', 'PlanEstimate', 'Requirement', 'FormattedID', 'Name', 'Blocked', 'BlockedReason',
-                    'ScheduleState', 'State', 'Tasks:summary[State+Blocked]', 'TestCases'],
+                models: ['User Story', 'Defect', 'PortfolioItem/Feature'],
+                fetch: ['Defects:summary[State;ScheduleState+Blocked]', 'PlanEstimate', 'Requirement', 
+                        'FormattedID', 'Name', 'ScheduleState', 'State'],
                 useShallowFetch: true,
                 sorters: [
-                    {property: 'ScheduleState'}
+                    {property: 'ScheduleState'},
+                    {property: 'State'}
                 ],
                 filters: [this.context.getTimeboxScope().getQueryFilter()],
                 context: this.context.getDataContext(),
                 limit: Infinity,
                 requester: this
             });
+            
+            this.featureStore =  Ext.create('Rally.data.wsapi.artifact.Store', {
+                models: ['PortfolioItem/Feature'],
+                fetch: ['State'],
+                useShallowFetch: true,
+                sorters: [
+                    {property: 'State'}
+                ],
+                filters: [this.context.getTimeboxScope().getQueryFilter()],
+                context: this.context.getDataContext(),
+                limit: Infinity,
+                requester: this
+            }); 
 
             //need to configure the items at the instance level, not the class level (i.e. don't use the 'defaults' config)
             this.items = this._configureItems(this.items);
+//            this.items[0].store = this.featureStore;
 
             this.on('expand', this._onExpand, this);
             this.on('collapse', this._onCollapse, this);
@@ -183,7 +192,6 @@ var bannerme;
 
         _configureItems: function (items) {
             var defaults = this._getItemDefaults();
-
             return _.map(items, function(item) {
                 return _.defaults(_.cloneDeep(item), defaults);
             });
@@ -196,6 +204,7 @@ var bannerme;
         _update: function () {
             if(this._hasTimebox()) {
                 this.store.load();
+//                this.featureStore.load();
             } else {
                 this._recordLoadEnd();
             }

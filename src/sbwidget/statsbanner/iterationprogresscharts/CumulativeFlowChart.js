@@ -20,9 +20,9 @@
             this.callParent(arguments);
 
             Ext.Ajax.request({
-                url: '/slm/charts/icfc.sp',
+                url: '/slm/charts/rcfc.sp',
                 params: {
-                    iterationOid: this.context.getTimeboxScope().getRecord().getId(),
+                    releaseOid: this.context.getTimeboxScope().getRecord().getId(),
                     cpoid: this.context.getProject().ObjectID,
                     bigChart: true
                 },

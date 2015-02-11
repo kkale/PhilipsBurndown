@@ -61,25 +61,25 @@
                     clickHandler: boundClickHandler,
                     context: this.context,
                     store: this.store
-                },
-                {
-                    xtype: 'statsbannerburndownchart',
-                    width: 150,
-                    height: 63,
-                    minimalMode: true,
-                    clickHandler: boundClickHandler,
-                    context: this.context,
-                    store: this.store
-                },
-                {
-                    xtype: 'statsbannercumulativeflowchart',
-                    width: 150,
-                    height: 63,
-                    minimalMode: true,
-                    clickHandler: boundClickHandler,
-                    context: this.context,
-                    store: this.store
                 }
+//                {
+//                    xtype: 'statsbannerburndownchart',
+//                    width: 150,
+//                    height: 63,
+//                    minimalMode: true,
+//                    clickHandler: boundClickHandler,
+//                    context: this.context,
+//                    store: this.store
+//                },
+//                {
+//                    xtype: 'statsbannercumulativeflowchart',
+//                    width: 150,
+//                    height: 63,
+//                    minimalMode: true,
+//                    clickHandler: boundClickHandler,
+//                    context: this.context,
+//                    store: this.store
+//                }
             ];
 
             _.each(this.carouselItems, function(carouselItem) {

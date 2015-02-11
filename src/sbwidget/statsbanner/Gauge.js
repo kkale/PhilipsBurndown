@@ -136,8 +136,8 @@
                     var timebox = this.getContext().getTimeboxScope().getRecord();
                     if(timebox) {
                         return Rally.util.Timebox.getCounts(
-                            timebox.get('StartDate'),
-                            timebox.get('EndDate'),
+                            timebox.get('ReleaseStartDate'),
+                            timebox.get('ReleaseDate'),
                             this.getContext().getWorkspace().WorkspaceConfiguration.WorkDays,
                             tzOffset);
                     } else {
@@ -181,11 +181,10 @@
             };
             var accepted = _.indexOf(scheduleStates, 'Accepted');
             _.each(this.store.getRange(), function (record) {
-                var estimate = record.get('PlanEstimate') || 0;
                 if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
-                    acceptanceData.accepted += estimate;
+                    acceptanceData.accepted += 1;
                 }
-                acceptanceData.total += estimate;
+                acceptanceData.total += 1;
             }, this);
             return acceptanceData;
         }

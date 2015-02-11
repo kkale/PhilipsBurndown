@@ -10,7 +10,7 @@
         alias:'widget.statsbanneriterationprogressdialog',
         requires: [
             'Rally.apps.iterationtrackingboard.statsbanner.IterationProgressDialogChartToggle',
-            'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.BurndownChart',
+//            'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.BurndownChart',
             'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.CumulativeFlowChart',
             'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.PieChart',
             'Rally.ui.carousel.Carousel'
@@ -61,21 +61,21 @@
                         width: chartWidth,
                         height: chartHeight,
                         context: this.context
-                    },
-                    {
-                        xtype: 'statsbannerburndownchart',
-                        width: chartWidth,
-                        height: chartHeight,
-                        context: this.context,
-                        store: this.store
-                    },
-                    {
-                        xtype: 'statsbannercumulativeflowchart',
-                        width: chartWidth,
-                        height: chartHeight,
-                        context: this.context,
-                        store: this.store
                     }
+//                    {
+//                        xtype: 'statsbannerburndownchart',
+//                        width: chartWidth,
+//                        height: chartHeight,
+//                        context: this.context,
+//                        store: this.store
+//                    },
+//                    {
+//                        xtype: 'statsbannercumulativeflowchart',
+//                        width: chartWidth,
+//                        height: chartHeight,
+//                        context: this.context,
+//                        store: this.store
+//                    }
                 ],
                 startingIndex: this.startingIndex,
                 listeners: {

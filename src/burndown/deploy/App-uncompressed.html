@@ -517,8 +517,8 @@
                     var timebox = this.getContext().getTimeboxScope().getRecord();
                     if(timebox) {
                         return Rally.util.Timebox.getCounts(
-                            timebox.get('StartDate'),
-                            timebox.get('EndDate'),
+                            timebox.get('ReleaseStartDate'),
+                            timebox.get('ReleaseDate'),
                             this.getContext().getWorkspace().WorkspaceConfiguration.WorkDays,
                             tzOffset);
                     } else {
@@ -562,11 +562,10 @@
             };
             var accepted = _.indexOf(scheduleStates, 'Accepted');
             _.each(this.store.getRange(), function (record) {
-                var estimate = record.get('PlanEstimate') || 0;
                 if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
-                    acceptanceData.accepted += estimate;
+                    acceptanceData.accepted += 1;
                 }
-                acceptanceData.total += estimate;
+                acceptanceData.total += 1;
             }, this);
             return acceptanceData;
         }
@@ -585,7 +584,7 @@
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Planned Velocity</div>',
+            '<div class="stat-title">Completed Features</div>',
             '<div class="stat-metric">',
             '<div class="metric-chart"></div>',
             '<div class="metric-chart-text percent-offset">',
@@ -595,7 +594,7 @@
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<div class="stat-title">Planned Velocity</div>',
+            '<div class="stat-title">Completed Features</div>',
             '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
@@ -610,6 +609,7 @@
         },
 
         onDataChanged: function() {
+            console.log("Inside onDataChanged");
             this._getRenderData().then({
                 success: function(renderData){
                     this.update(renderData);
@@ -630,28 +630,29 @@
         },
 
         _getRenderData: function() {
+            console.log("Store: ", this.store);
+            console.log("Records: ", this.store.getRange());
             var deferred = Ext.create('Deft.Deferred');
-            var estimate = _.reduce(this.store.getRange(), function(accum, record) {
-                return accum + record.get('PlanEstimate') || 0;
-            }, 0);
-
-            estimate = Math.round(estimate * 100) / 100;
-
-            var timebox = this.getContext().getTimeboxScope();
-            var timeboxUnits = this._getTimeboxUnits();
-            timebox.getPlannedVelocity().then({
-                success: function(plannedVelocity){
-                    var percentage = plannedVelocity === 0 ? 0 : Math.round(estimate / plannedVelocity * 100);
-
-                    var data = {
-                        estimate: estimate,
-                        percentage: percentage,
-                        plannedVelocity: plannedVelocity,
-                        unit: timeboxUnits
-                    };
-                    deferred.resolve(data);
+            var allFeatures = _.filter(this.store.getRange(), function(record){
+                return record.get("_type") == "portfolioitem/feature";
+            } );            
+            var doneFeatures = _.reduce(allFeatures, function (total, feature){
+                if (feature.get("State") !== null && feature.get("State").get("Name") == "Done") {
+                    return total + 1;
                 }
-            });
+            }, 0); 
+
+            if ( isNaN(doneFeatures) ) {
+                doneFeatures = 0;
+            }
+            
+             var data = {
+                    estimate: doneFeatures,
+                    percentage: doneFeatures/allFeatures.length,
+                    plannedVelocity: allFeatures.length,
+                    unit: ''
+                };
+            deferred.resolve(data);
 
             return deferred.promise;
         },
@@ -714,7 +715,7 @@
             '<div class="metric-chart-text">',
             '{remaining}',
             '</div>',
-            '<div class="metric-subtext">days left of {workdays}</div>',
+            '<div class="metric-subtext">{remaining} days left of {workdays}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
@@ -812,12 +813,12 @@
             '<div class="stat-title">Defects</div>',
             '<div class="stat-metric">',
             '<div class="metric-icon icon-defect"></div>{activeCount}',
-            '<div class="stat-secondary">Active</div>',
+            '<div class="stat-secondary">Closed</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
             '<span class="metric-icon icon-defect"></span>',
-            '<div class="stat-title">Defects</div>',
+            '<div class="stat-title">Defects Closed</div>',
             '<div class="stat-metric">{activeCount}</div>',
             '</div>'
         ],
@@ -838,11 +839,11 @@
                 var defectSummary = record.get('Summary') && record.get('Summary').Defects;
                 if (defectSummary) {
                     _.each(defectSummary.State, function(count, state) {
-                        if (state !== 'Closed') {
+                        if (state == 'Closed') {
                             activeDefects += count;
                         }
                     }, this);
-                } else if(record.self.typePath === 'defect' && record.get('State') !== 'Closed') {
+                } else if(record.self.typePath === 'defect' && record.get('State') == 'Closed') {
                     activeDefects++;
                 }
             }, this);
@@ -867,17 +868,17 @@
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Accepted</div>',
+            '<div class="stat-title">Accepted Stories</div>',
             '<div class="stat-metric">',
             '<div class="metric-chart"></div>',
             '<div class="metric-chart-text percent-offset">',
             '{percentage}<div class="metric-percent">%</div>',
             '</div>',
-            '<div class="metric-subtext">{accepted} of {total} {unit}</div>',
+            '<div class="metric-subtext">{accepted} of {total}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<div class="stat-title">Accepted</div>',
+            '<div class="stat-title">Accepted Stories</div>',
             '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
@@ -1393,9 +1394,9 @@
             this.callParent(arguments);
 
             Ext.Ajax.request({
-                url: '/slm/charts/icfc.sp',
+                url: '/slm/charts/rcfc.sp',
                 params: {
-                    iterationOid: this.context.getTimeboxScope().getRecord().getId(),
+                    releaseOid: this.context.getTimeboxScope().getRecord().getId(),
                     cpoid: this.context.getProject().ObjectID,
                     bigChart: true
                 },
@@ -2186,31 +2187,32 @@
                 hideDelay: 0
             },
             userAction:'IterationProgressApp - User clicked pie chart'
-        },
-        {
-            cls: 'toggle center burndown',
-            iconCls: 'icon-bars',
-            frame: false,
-            toggleGroup: 'iterationprogressviewtoggle',
-            toolTipConfig: {
-                html: 'Burndown',
-                anchor: 'top',
-                hideDelay: 0
-            },
-            userAction:'IterationProgressApp - User clicked burndown'
-        },
-        {
-            cls: 'toggle rly-right cumulativeflow',
-            iconCls: 'icon-graph',
-            frame: false,
-            toggleGroup: 'iterationprogressviewtoggle',
-            toolTipConfig: {
-                html: 'Cumulative Flow',
-                anchor: 'top',
-                hideDelay: 0
-            },
-            userAction:'IterationProgressApp - User clicked CFD'
-        }],
+        }
+//        {
+//            cls: 'toggle center burndown',
+//            iconCls: 'icon-bars',
+//            frame: false,
+//            toggleGroup: 'iterationprogressviewtoggle',
+//            toolTipConfig: {
+//                html: 'Burndown',
+//                anchor: 'top',
+//                hideDelay: 0
+//            },
+//            userAction:'IterationProgressApp - User clicked burndown'
+//        },
+//        {
+//            cls: 'toggle rly-right cumulativeflow',
+//            iconCls: 'icon-graph',
+//            frame: false,
+//            toggleGroup: 'iterationprogressviewtoggle',
+//            toolTipConfig: {
+//                html: 'Cumulative Flow',
+//                anchor: 'top',
+//                hideDelay: 0
+//            },
+//            userAction:'IterationProgressApp - User clicked CFD'
+//        }
+        ],
 
         initComponent: function(config) {
             this.initConfig(config);
@@ -2272,7 +2274,7 @@
         alias:'widget.statsbanneriterationprogressdialog',
         requires: [
             'Rally.apps.iterationtrackingboard.statsbanner.IterationProgressDialogChartToggle',
-            'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.BurndownChart',
+//            'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.BurndownChart',
             'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.CumulativeFlowChart',
             'Rally.apps.iterationtrackingboard.statsbanner.iterationprogresscharts.PieChart',
             'Rally.ui.carousel.Carousel'
@@ -2323,21 +2325,21 @@
                         width: chartWidth,
                         height: chartHeight,
                         context: this.context
-                    },
-                    {
-                        xtype: 'statsbannerburndownchart',
-                        width: chartWidth,
-                        height: chartHeight,
-                        context: this.context,
-                        store: this.store
-                    },
-                    {
-                        xtype: 'statsbannercumulativeflowchart',
-                        width: chartWidth,
-                        height: chartHeight,
-                        context: this.context,
-                        store: this.store
                     }
+//                    {
+//                        xtype: 'statsbannerburndownchart',
+//                        width: chartWidth,
+//                        height: chartHeight,
+//                        context: this.context,
+//                        store: this.store
+//                    },
+//                    {
+//                        xtype: 'statsbannercumulativeflowchart',
+//                        width: chartWidth,
+//                        height: chartHeight,
+//                        context: this.context,
+//                        store: this.store
+//                    }
                 ],
                 startingIndex: this.startingIndex,
                 listeners: {
@@ -2438,25 +2440,25 @@
                     clickHandler: boundClickHandler,
                     context: this.context,
                     store: this.store
-                },
-                {
-                    xtype: 'statsbannerburndownchart',
-                    width: 150,
-                    height: 63,
-                    minimalMode: true,
-                    clickHandler: boundClickHandler,
-                    context: this.context,
-                    store: this.store
-                },
-                {
-                    xtype: 'statsbannercumulativeflowchart',
-                    width: 150,
-                    height: 63,
-                    minimalMode: true,
-                    clickHandler: boundClickHandler,
-                    context: this.context,
-                    store: this.store
                 }
+//                {
+//                    xtype: 'statsbannerburndownchart',
+//                    width: 150,
+//                    height: 63,
+//                    minimalMode: true,
+//                    clickHandler: boundClickHandler,
+//                    context: this.context,
+//                    store: this.store
+//                },
+//                {
+//                    xtype: 'statsbannercumulativeflowchart',
+//                    width: 150,
+//                    height: 63,
+//                    minimalMode: true,
+//                    clickHandler: boundClickHandler,
+//                    context: this.context,
+//                    store: this.store
+//                }
             ];
 
             _.each(this.carouselItems, function(carouselItem) {
@@ -2698,6 +2700,7 @@
         width: '100%',
         stateful: true,
         stateEvents: ['expand', 'collapse'],
+        featureStore: undefined,
 
         config: {
             context: null,
@@ -2748,31 +2751,39 @@
             this.subscribe(this, Rally.Message.objectCreate, this._update, this);
             this.subscribe(this, Rally.Message.objectUpdate, this._update, this);
             this.subscribe(this, Rally.Message.bulkUpdate, this._update, this);
-            this.subscribe(this, Rally.Message.bulkImport, this._update, this);
-            bannerme = this;
-            console.log("this.context : ", this.context);
-            console.log("this.context.getTimeboxScope() : ", this.context.getTimeboxScope());
-            
-            console.log("QueryFilter : ", this.context.getTimeboxScope().getQueryFilter());
-            console.log("QueryFilter BannerMe: ", bannerme.context.getTimeboxScope().getQueryFilter());
-            
+            this.subscribe(this, Rally.Message.bulkImport, this._update, this);            
 
             this.store = Ext.create('Rally.data.wsapi.artifact.Store', {
-                models: ['User Story', 'Defect', 'Defect Suite', 'Test Set'],
-                fetch: ['Defects:summary[State;ScheduleState+Blocked]', 'PlanEstimate', 'Requirement', 'FormattedID', 'Name', 'Blocked', 'BlockedReason',
-                    'ScheduleState', 'State', 'Tasks:summary[State+Blocked]', 'TestCases'],
+                models: ['User Story', 'Defect', 'PortfolioItem/Feature'],
+                fetch: ['Defects:summary[State;ScheduleState+Blocked]', 'PlanEstimate', 'Requirement', 
+                        'FormattedID', 'Name', 'ScheduleState', 'State'],
                 useShallowFetch: true,
                 sorters: [
-                    {property: 'ScheduleState'}
+                    {property: 'ScheduleState'},
+                    {property: 'State'}
                 ],
                 filters: [this.context.getTimeboxScope().getQueryFilter()],
                 context: this.context.getDataContext(),
                 limit: Infinity,
                 requester: this
             });
+            
+            this.featureStore =  Ext.create('Rally.data.wsapi.artifact.Store', {
+                models: ['PortfolioItem/Feature'],
+                fetch: ['State'],
+                useShallowFetch: true,
+                sorters: [
+                    {property: 'State'}
+                ],
+                filters: [this.context.getTimeboxScope().getQueryFilter()],
+                context: this.context.getDataContext(),
+                limit: Infinity,
+                requester: this
+            }); 
 
             //need to configure the items at the instance level, not the class level (i.e. don't use the 'defaults' config)
             this.items = this._configureItems(this.items);
+//            this.items[0].store = this.featureStore;
 
             this.on('expand', this._onExpand, this);
             this.on('collapse', this._onCollapse, this);
@@ -2853,7 +2864,6 @@
 
         _configureItems: function (items) {
             var defaults = this._getItemDefaults();
-
             return _.map(items, function(item) {
                 return _.defaults(_.cloneDeep(item), defaults);
             });
@@ -2866,6 +2876,7 @@
         _update: function () {
             if(this._hasTimebox()) {
                 this.store.load();
+//                this.featureStore.load();
             } else {
                 this._recordLoadEnd();
             }
@@ -2968,7 +2979,8 @@
                 calculatorConfig: {
                     timeZone: "GMT",
                     completedScheduleStateNames: null, // defaults hide problems
-                    enableProjections: true
+                    enableProjections: true,
+                    timebox: null
 
                     //chartAggregationType: ''
                 },
@@ -3098,6 +3110,7 @@
         onScopeChange: function (scope) {
             if (!this.ignoreOnScopeChange) {
                 this._rebuildChartForScope(scope.getRecord().get('_ref'));
+
             }
         },
 
@@ -3122,12 +3135,9 @@
                 this.ignoreOnScopeChange = true;
                 this._getScopePicker().on('ready', this._loadScopePreference, this, {single: true});
             }
-            console.log("context in burndown: ", this.context.getTimeboxScope());            
-            this._addStatsBanner();
         },
 
         _addStatsBanner: function() {
-            console.log("context in burndown: ", this.getContext().getTimeboxScope());
             this.remove('statsBanner');
             this.add({
               xtype: 'statsbanner',
@@ -3176,6 +3186,7 @@
 
             this._saveScopePreference(scopeRef);
             this._loadScopeObject(scopeRef);
+            this._addStatsBanner();
         },
 
         _destroyChart: function () {
@@ -3863,11 +3874,7 @@
                     'as': 'Scope_max',
                     'f': function(seriesData) {
                             var max = 0, i = 0;
-                            for (i=0;i<seriesData.length;i++) {
-                                if(seriesData[i].Accepted + seriesData[i]['To Do'] > max) {
-                                    max = seriesData[i].Accepted + seriesData[i]['To Do'];
-                                }
-                            }
+                            max = seriesData[seriesData.length-1]['To Do'];
                             return max;
                          }
                 }
@@ -3890,14 +3897,6 @@
                     },
                     "display": "line"
                 }
-//                {
-//                    "as": "Prediction",
-//                    "f": function (row, index, summaryMetrics, seriesData) {
-//                        return null;
-//                    },
-//                    "display": "line",
-//                    "dashStyle": "Dash"
-//                }
             ];
         },
 
@@ -3908,7 +3907,7 @@
             var timeboxEnd = Ext.Date.add(this.scopeEndDate, Ext.Date.DAY, -1);
             if(this.projectionsConfig === undefined) {
                 this.projectionsConfig = {
-                    doubleTimeboxEnd: doubleTimeboxEnd,
+                    doubleTimeboxEnd: timeboxEnd,
                     timeboxEnd: timeboxEnd,
 
                     series: [
@@ -4012,9 +4011,12 @@
              }
 
              var lastDate = Ext.Date.parse(chartData.categories[chartData.categories.length - 1], 'Y-m-d');
+             console.log("END DAte: ", endDate);
+             console.log("lastDate: ", lastDate);
              if(endDate > lastDate) {
                 // the scopeEndDate date wasn't found in the current categories...we need to extend categories to include it
                 // (honoring "workDays").
+                 console.log("last date is earlier, add more dates");
 
                 index = chartData.categories.length;
                 var dt = Ext.Date.add(lastDate, Ext.Date.DAY, 1);
@@ -4030,6 +4032,7 @@
                 index = chartData.categories.length - 1;
              } else {
                  // it is in "scope"...set index to the index of the last workday in scope
+                 console.log("last date is later");
                  index = this._indexOfDate(chartData, endDate);
                  if(index === -1) {
                     // it's in "scope", but falls on a non-workday...back up to the previous workday
@@ -4043,12 +4046,22 @@
                 return;
              }
              // set first and last point, and let connectNulls fill in the rest
-             var i;
              var seriesData = chartData.series[2].data;
-             for (i=1;i<index;i++) {
-                seriesData[i] = null;
+             var todoData = chartData.series[0].data;
+             console.log("todoData: ", todoData);
+             seriesData[0] = null;
+             
+             var tik = 0;             
+             while (todoData[++tik] !== null) { 
+                 console.log(tik, " : ", todoData[tik]);                 
+                 seriesData[tik] = null;
              }
-             seriesData[index] = 0;
+             console.log("tik: ", tik);
+             seriesData[tik-1] = todoData[tik-1];
+             
+             console.log("ideal data: ", seriesData);
+             
+             seriesData[seriesData.length-1] = 0;
         },
 
         _indexOfDate: function(chartData, date) {
@@ -4079,9 +4092,6 @@
 
     Ext.define('Rally.apps.charts.burndown.ReleaseBurnDownApp', {
         extend: 'Rally.apps.charts.burndown.BurnDownApp',
-        help: {
-            id: 278
-        },
         integrationHeaders : {
             name: 'Release Burndown'
         }
@@ -4114,298 +4124,225 @@
 @proxima-nova: ProximaNova, Helvetica, Arial;
     </style>
     <style type="text/css">
-        @import "RallyVariables.less";
-
-.border-radius(@radius) {
-  -webkit-border-radius: @radius;
-  -moz-border-radius: @radius;
-  border-radius: @radius;
+                .stat-panel .collapsed-widget,
+.stat-panel .collapsed-widget > div {
+  display: none;
 }
-
-.override-ext-container() {
-  > span {
-    display: inline !important;
-    width: auto !important;
-
-    > div {
-      display: block !important;
-    }
-  }
+.stat-panel .expanded-widget,
+.stat-panel .expanded-widget > div {
+  display: block;
 }
-
-.stat-panel {
-  .collapsed-widget,
-  .collapsed-widget > div {
-    display: none;
-  }
-
-  .expanded-widget,
-  .expanded-widget > div {
-    display: block;
-  }
-
-  &.collapsed {
-    .collapsed-widget,
-    .collapsed-widget > div {
-      display: inline-block;
-    }
-
-    .expanded-widget,
-    .expanded-widget > div {
-      display: none;
-    }
-  }
+.stat-panel.collapsed .collapsed-widget,
+.stat-panel.collapsed .collapsed-widget > div {
+  display: inline-block;
 }
-
-.stats-banner {
-
-  .stat-panel {
-    border-left: 1px solid @grey3;
-    height: 110px;
-    text-align: center;
-
-    &:first-child {
-      border-left: 0;
-    }
-
-    &:last-child {
-      border-left-width: 2px;
-    }
-
-    .stat-title {
-      color: @grey9;
-      font-family: @proxima-nova-semi-bold;
-      font-size: 14px;
-      padding-top: 5px;
-    }
-
-    .stat-metric {
-      color: @grey7;
-      font-family: @proxima-nova-light;
-      font-size: 18px;
-      height: 85px;
-      padding-top: 20px;
-
-      .metric-percent {
-        display: inline;
-        font-size: 12px;
-        vertical-align: super;
-      }
-
-      .metric-icon {
-        color: @grey6;
-        font-size: 18px;
-        padding-right: 5px;
-      }
-
-      .metric-chart {
-        position: absolute;
-        top: 22px;
-        width: 100%;
-      }
-
-      .metric-subtext {
-        bottom: 7px;
-        color: @grey6;
-        font-family: @proxima-nova;
-        font-size: 11px;
-        position: absolute;
-        text-transform: lowercase;
-        width: 100%;
-      }
-
-      .metric-chart-text {
-        position: absolute;
-        top: 43px;
-        width: 100%;
-
-        &.percent-offset {
-          left: 3px;
-          top: 41px;
-        }
-      }
-
-      .stat-secondary {
-        color: @grey6;
-        font-family: @proxima-nova;
-        font-size: 11px;
-        text-transform: lowercase;
-      }
-
-      .stat-carousel {
-        display:inline-block;
-        font-family: @proxima-nova;
-        font-size: 12px;
-        margin-top: -20px;
-
-        .rally-carousel-pane {
-          .@{prefix}box-inner {
-            top: 0px !important;
-          }
-        }
-
-        .rly-carousel {
-          .override-ext-container();
-
-          .carousel-panel {
-            .override-ext-container();
-          }
-        }
-      }
-    }
-
-    .chart .highcharts-container {
-      cursor: pointer;
-    }
-
-    .gauge .chart .highcharts-container {
-      cursor: default;
-    }
-
-    .header {
-      display:none;
-    }
-
-    &.collapse-expand {
-      background-color: @grey1;
-      width: 23px;
-
-      .toggle-icon {
-        color: @grey4;
-        font-size: 15px;
-        padding-top: 4px;
-        position: relative;
-        right: 1px;
-      }
-
-      &:hover {
-        cursor: pointer;
-
-        .toggle-icon {
-          color: @grey8;
-        }
-      }
-    }
-  }
-
-  &.collapsed {
-    cursor: pointer;
-
-    .stat-panel {
-      height: 25px;
-      padding-top: 2px;
-
-      &.collapse-expand {
-        .toggle-icon {
-          padding-top: 2px;
-        }
-      }
-
-      .metric-icon {
-        color: @grey6;
-        font-size: 14px;
-        padding-right: 5px;
-        vertical-align: middle;
-      }
-
-      .stat-title {
-        color: @grey9;
-        display: inline;
-        font-family: @proxima-nova-semi-bold;
-        font-size: 12px;
-        vertical-align: middle;
-      }
-
-      .stat-metric {
-        color: @grey6;
-        display: inline;
-        font-family: @proxima-nova;
-        font-size: 14px;
-        height: auto;
-        padding-top: auto;
-        padding-left: 10px;
-        vertical-align: middle;
-
-        .stat-metric-secondary {
-          font-size: 11px;
-        }
-
-        .metric-percent {
-          font-size: 10px;
-          vertical-align: super;
-        }
-      }
-    }
-  }
+.stat-panel.collapsed .expanded-widget,
+.stat-panel.collapsed .expanded-widget > div {
+  display: none;
 }
-
+.stats-banner .stat-panel {
+  border-top: 1px solid #d6d6d6;
+  border-left: 1px solid #d6d6d6;
+  border-bottom: 1px solid #d6d6d6;
+  height: 110px;
+  text-align: center;
+}
+.stats-banner .stat-panel:first-child {
+  border-left: 0;
+}
+.stats-banner .stat-panel:last-child {
+  border-left-width: 2px;
+}
+.stats-banner .stat-panel .stat-title {
+  color: #222222;
+  font-family: ProximaNovaSemiBold, Helvetica, Arial;
+  font-size: 14px;
+  padding-top: 5px;
+}
+.stats-banner .stat-panel .stat-metric {
+  color: #666666;
+  font-family: ProximaNovaLight, Helvetica, Arial;
+  font-size: 18px;
+  height: 85px;
+  padding-top: 20px;
+}
+.stats-banner .stat-panel .stat-metric .metric-percent {
+  display: inline;
+  font-size: 12px;
+  vertical-align: super;
+}
+.stats-banner .stat-panel .stat-metric .metric-icon {
+  color: #888888;
+  font-size: 18px;
+  padding-right: 5px;
+}
+.stats-banner .stat-panel .stat-metric .metric-chart {
+  position: absolute;
+  top: 22px;
+  width: 100%;
+}
+.stats-banner .stat-panel .stat-metric .metric-subtext {
+  bottom: 7px;
+  color: #888888;
+  font-family: ProximaNova, Helvetica, Arial;
+  font-size: 11px;
+  position: absolute;
+  text-transform: lowercase;
+  width: 100%;
+}
+.stats-banner .stat-panel .stat-metric .metric-chart-text {
+  position: absolute;
+  top: 43px;
+  width: 100%;
+}
+.stats-banner .stat-panel .stat-metric .metric-chart-text.percent-offset {
+  left: 3px;
+  top: 41px;
+}
+.stats-banner .stat-panel .stat-metric .stat-secondary {
+  color: #888888;
+  font-family: ProximaNova, Helvetica, Arial;
+  font-size: 11px;
+  text-transform: lowercase;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel {
+  display: inline-block;
+  font-family: ProximaNova, Helvetica, Arial;
+  font-size: 12px;
+  margin-top: -20px;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel .rally-carousel-pane .x-box-inner {
+  top: 0px !important;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel .carousel > span {
+  display: inline !important;
+  width: auto !important;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel .carousel > span > div {
+  display: block !important;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel .carousel .carousel-panel > span {
+  display: inline !important;
+  width: auto !important;
+}
+.stats-banner .stat-panel .stat-metric .stat-carousel .carousel .carousel-panel > span > div {
+  display: block !important;
+}
+.stats-banner .stat-panel .chart .highcharts-container {
+  cursor: pointer;
+}
+.stats-banner .stat-panel .gauge .chart .highcharts-container {
+  cursor: default;
+}
+.stats-banner .stat-panel .header {
+  display: none;
+}
+.stats-banner .stat-panel.collapse-expand {
+  background-color: #f6f6f6;
+  width: 23px;
+}
+.stats-banner .stat-panel.collapse-expand .toggle-icon {
+  color: #c0c0c0;
+  font-size: 18px;
+  position: relative;
+  right: 1px;
+}
+.stats-banner .stat-panel.collapse-expand:hover {
+  cursor: pointer;
+}
+.stats-banner .stat-panel.collapse-expand:hover .toggle-icon {
+  color: #888888;
+}
+.stats-banner.collapsed .stat-panel {
+  height: 25px;
+  padding-top: 2px;
+}
+.stats-banner.collapsed .stat-panel .metric-icon {
+  color: #888888;
+  font-size: 14px;
+  padding-right: 5px;
+  vertical-align: middle;
+}
+.stats-banner.collapsed .stat-panel .stat-title {
+  color: #222222;
+  display: inline;
+  font-family: ProximaNovaSemiBold, Helvetica, Arial;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.stats-banner.collapsed .stat-panel .stat-metric {
+  color: #888888;
+  display: inline;
+  font-family: ProximaNova, Helvetica, Arial;
+  font-size: 14px;
+  height: auto;
+  padding-top: auto;
+  padding-left: 10px;
+  vertical-align: middle;
+}
+.stats-banner.collapsed .stat-panel .stat-metric .stat-metric-secondary {
+  font-size: 11px;
+}
+.stats-banner.collapsed .stat-panel .stat-metric .metric-percent {
+  font-size: 10px;
+  vertical-align: super;
+}
 .pie-chart-legend {
   color: #3E576F;
   font-size: 12px;
   padding: 5px;
   border: 1px solid #909090;
-  .border-radius(5px);
-
-  .legend-swatch {
-    width: 17px;
-    height: 12px;
-    border: 1px solid #EEE;
-    .border-radius(5px);
-    float: left;
-    margin: 0 3px 0 6px;
-
-    &.defined-sample-swatch {
-      background: #E0E0E0; /* light-gray */
-    }
-
-    &.in-progress-sample-swatch {
-      background: @cyan;
-    }
-
-    &.completed-sample-swatch {
-      background: @lime;
-    }
-
-    &.blocked-sample-swatch {
-      background: #EF3F35; /* rally red */
-    }
-  }
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
 }
-
-.iteration-progress-dialog .rly-carousel .carousel-panel .scroll-button span {
+.pie-chart-legend .legend-swatch {
+  width: 17px;
+  height: 12px;
+  border: 1px solid #EEE;
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+  float: left;
+  margin: 0 3px 0 6px;
+}
+.pie-chart-legend .legend-swatch.defined-sample-swatch {
+  background: #E0E0E0;
+  /* light-gray */
+}
+.pie-chart-legend .legend-swatch.in-progress-sample-swatch {
+  background: #00a9e0;
+}
+.pie-chart-legend .legend-swatch.completed-sample-swatch {
+  background: #8dc63f;
+}
+.pie-chart-legend .legend-swatch.blocked-sample-swatch {
+  background: #EF3F35;
+  /* rally red */
+}
+.iteration-progress-dialog .carousel .carousel-panel .scroll-button span {
   width: 45px;
   height: 50px;
   line-height: 46px;
-  &:hover {
-    background-color: @grey2;
-    color: @grey7;
-  }
 }
-
+.iteration-progress-dialog .carousel .carousel-panel .scroll-button span:hover {
+  background-color: #e6e6e6;
+  color: #666666;
+}
 .iteration-progress-toggle-button-group {
   margin-bottom: 5px;
 }
-
-.@{prefix}gecko .stats-banner.collapsed {
-  .stat-panel {
-    .stat-metric {
-      line-height: 20px;
-      vertical-align: top;
-
-      .metric-percent {
-        line-height: 10px;
-      }
-    }
-  }
+.x-gecko .stats-banner.collapsed .stat-panel .stat-metric {
+  line-height: 20px;
+  vertical-align: top;
+}
+.x-gecko .stats-banner.collapsed .stat-panel .stat-metric .metric-percent {
+  line-height: 10px;
+}
+.x-gecko.x-mac .stats-banner.collapsed .stat-panel .stat-metric {
+  line-height: 22px;
 }
 
-.@{prefix}gecko.@{prefix}mac .stats-banner.collapsed {
-  .stat-panel {
-    .stat-metric {
-      line-height: 22px;
-    }
-  }
-}
     </style>
     <style type="text/css">
         .burndown-app .chartControls,

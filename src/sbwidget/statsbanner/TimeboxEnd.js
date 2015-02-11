@@ -20,7 +20,7 @@
             '<div class="metric-chart-text">',
             '{remaining}',
             '</div>',
-            '<div class="metric-subtext">days left of {workdays}</div>',
+            '<div class="metric-subtext">{remaining} days left of {workdays}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
