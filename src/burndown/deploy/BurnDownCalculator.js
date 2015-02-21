@@ -41,7 +41,7 @@
 
                         return 0;
                     }
-                }
+                }                
             ];
         },
 
@@ -66,11 +66,7 @@
                     'as': 'Scope_max',
                     'f': function(seriesData) {
                             var max = 0, i = 0;
-                            for (i=0;i<seriesData.length;i++) {
-                                if(seriesData[i].Accepted + seriesData[i]['To Do'] > max) {
-                                    max = seriesData[i].Accepted + seriesData[i]['To Do'];
-                                }
-                            }
+                            max = seriesData[seriesData.length-1]['To Do'];
                             return max;
                          }
                 }
@@ -78,7 +74,17 @@
         },
 
         getDerivedFieldsAfterSummary: function () {
+            console.log("StartDate: ", this.startDate, ", EndDate: ", this.scopeEndDate);
+            console.log("Config: ", this.config);
+            
             return  [
+                {
+                    "as": "Planned Velocity",
+                    "f": function (row, index, summaryMetrics, seriesData) {
+                        return null;
+                    },
+                    "display": "line"
+                },
                 {
                     "as": "Ideal",
                     "f": function (row, index, summaryMetrics, seriesData) {
@@ -92,22 +98,7 @@
                         return Math.floor(100 * (max - index * incrementAmount)) / 100;
                     },
                     "display": "line"
-                },
-                {
-                    "as": "Prediction",
-                    "f": function (row, index, summaryMetrics, seriesData) {
-                        return null;
-                    },
-                    "display": "line",
-                    "dashStyle": "Dash"
-                },
-                {
-                    "as": "Planned Velocity",
-                    "f": function (row, index, summaryMetrics, seriesData) {
-                        return null;
-                    },
-                    "display": "line"
-                }                
+                }
             ];
         },
 
@@ -118,7 +109,7 @@
             var timeboxEnd = Ext.Date.add(this.scopeEndDate, Ext.Date.DAY, -1);
             if(this.projectionsConfig === undefined) {
                 this.projectionsConfig = {
-                    doubleTimeboxEnd: doubleTimeboxEnd,
+                    doubleTimeboxEnd: timeboxEnd,
                     timeboxEnd: timeboxEnd,
 
                     series: [
@@ -134,7 +125,6 @@
                     }
                 };
             }
-
             return this.projectionsConfig;
         },
 
@@ -148,81 +138,61 @@
              return 0;
         },
 
-        _leastSquares: function(doneValues, firstIndex, lastIndex) {
+        _leastSquares: function(todoValues, firstIndex, lastIndex) {
             var n = (lastIndex + 1) - firstIndex;
             var i;
             var sumx = 0.0, sumx2 = 0.0, sumy = 0.0, sumy2 = 0.0, sumxy = 0.0;
             var slope, yintercept;
-            console.log("Total work done: ", doneValues[lastIndex]);
-            console.log("Total days: ", n);
-            console.log("Burndown rate: ", (doneValues[lastIndex]/n));
 
             //Compute sums of x, x^2, y, y^2, and xy
-            // for (i = firstIndex; i <= lastIndex; i++) {
-            //     sumx  = sumx  + i;
-            //     sumx2 = sumx2 + i * i;
-            //     sumy  = sumy  + todoValues[i];
-            //     sumy2 = sumy2 + todoValues[i] * todoValues[i];
-            //     sumxy = sumxy + i * todoValues[i];
-            //     console.log("sumx: ", sumx, "sumx2: ", sumx2, "sumy: ", sumy, "sumy2: ", sumy2, "sumxy: ", sumxy, "todoToday: ", todoValues[i]);
-            // }
-            slope = Math.round((doneValues[lastIndex]/n) * -1);
+            for (i = firstIndex; i <= lastIndex; i++) {
+                sumx  = sumx  + i;
+                sumx2 = sumx2 + i * i;
+                sumy  = sumy  + todoValues[i];
+                sumy2 = sumy2 + todoValues[i] * todoValues[i];
+                sumxy = sumxy + i * todoValues[i];
+            }
+            slope = (n * sumxy - sumx * sumy) / (n * sumx2 - sumx * sumx);
+            yintercept = (sumy * sumx2 - sumx * sumxy) / (n * sumx2 - sumx * sumx);
+
             return {slope: slope, yintercept: yintercept};
         },
 
         runCalculation: function (snapshots) {
             var chartData = this.callParent(arguments);
 
-
-             console.log("todo length: ", chartData.series[0].data.length);
-             console.log("done length: ", chartData.series[1].data.length);
-             console.log("ideal length: ", chartData.series[2].data.length);
-             console.log("categories length: ", chartData.categories.length);
-             this.originalLength = chartData.categories.length;
-
-
-
             if(chartData && chartData.projections && chartData.projections.series[0].slope > 0) {
             // if the slope is positive, try using least squares.  If that's also positive, then use the first result
-                var doneData = chartData.series[1].data;
-                var firstTodoIndex = this._firstNonZero(doneData),
-                    lastTodoIndex = (doneData.length - 1) - chartData.projections.pointsAddedCount;
+                var todoData = chartData.series[0].data;
+                var firstTodoIndex = this._firstNonZero(todoData),
+                    lastTodoIndex = (todoData.length - 1) - chartData.projections.pointsAddedCount;
 
-                var results = this._leastSquares(doneData, firstTodoIndex, lastTodoIndex);
-               // debugger;
-                console.log("Total work left: ", chartData.series[0].data[lastTodoIndex]);
-                console.log("Burndown slope: ", results.slope);
-                console.log("Number of days needed to finish work: ", chartData.series[0].data[lastTodoIndex]/-results.slope);
-
+                var results = this._leastSquares(todoData, firstTodoIndex, lastTodoIndex);
 
                 // override the prediction line only if least squares says the slope isn't positive
-                if(results.slope <= 0) {
+                if(results.slope <= 0 && chartData.series[3]) {
                     this.projectionsConfig.series[0].slope = results.slope;
 
                     chartData = this.callParent(arguments);
 
                     // project the plot back to the first todo value
-//                    chartData.series[3].data[firstTodoIndex] = ((results.slope * firstTodoIndex) + results.yintercept) + (chartData.series[3].data[lastTodoIndex] - ((results.slope * lastTodoIndex) + results.yintercept));
-//                    chartData.series[3].connectNulls = true;
+                    chartData.series[3].data[firstTodoIndex] = ((results.slope * firstTodoIndex) + results.yintercept) + (chartData.series[3].data[lastTodoIndex] - ((results.slope * lastTodoIndex) + results.yintercept));
+                    chartData.series[3].connectNulls = true;
                     this.projectionsConfig = undefined;
                 } else {
                 // DE18732, if the slope is up, truncate it at 1.25 of the max Ideal
-                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
-                    if (_.max(chartData.series[3].data) > predictionCeiling) {
-                        var i;
-                        var maxVal = predictionCeiling;
-                        for(i=0;i < chartData.series[3].data.length;i++) {
-                            if(chartData.series[3].data[i] > predictionCeiling) {
-                                chartData.series[3].data[i] = maxVal;
-                                maxVal = null;
-                            }
-                        }
-                    }
+//                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
+//                    if (_.max(chartData.series[3].data) > predictionCeiling) {
+//                        var i;
+//                        var maxVal = predictionCeiling;
+//                        for(i=0;i < chartData.series[3].data.length;i++) {
+//                            if(chartData.series[3].data[i] > predictionCeiling) {
+//                                chartData.series[3].data[i] = maxVal;
+//                                maxVal = null;
+//                            }
+//                        }
+//                    }
                 }
-
-                var plannedVelocity = chartData.series[4].data;
-                plannedVelocity[0] = this.config.plannedVelocity;
-                plannedVelocity[plannedVelocity.length-1] = this.config.plannedVelocity;
 
             }
 
@@ -241,14 +211,12 @@
              if(this.workDays.length < 1) {
                 return;
              }
+
              var lastDate = Ext.Date.parse(chartData.categories[chartData.categories.length - 1], 'Y-m-d');
-
-
-
-
              if(endDate > lastDate) {
                 // the scopeEndDate date wasn't found in the current categories...we need to extend categories to include it
                 // (honoring "workDays").
+                 console.log("last date is earlier, add more dates");
 
                 index = chartData.categories.length;
                 var dt = Ext.Date.add(lastDate, Ext.Date.DAY, 1);
@@ -264,6 +232,7 @@
                 index = chartData.categories.length - 1;
              } else {
                  // it is in "scope"...set index to the index of the last workday in scope
+                 console.log("last date is later");
                  index = this._indexOfDate(chartData, endDate);
                  if(index === -1) {
                     // it's in "scope", but falls on a non-workday...back up to the previous workday
@@ -276,22 +245,32 @@
              if(index < 0) {
                 return;
              }
-             // set first and last point, and let connectNulls fill in the rest
-
-             var dateIndex = this._indexOfDate(chartData, endDate);
-
-
-             console.log("originalLength", this.originalLength);
-             console.log("endDate: ", endDate);
-             console.log("dateIndex: ", dateIndex);
-             var idealData = chartData.series[2].data;
-             var todoData = chartData.series[0].data;
-             for (index = 0; index < dateIndex; index++) {
-                idealData[index] = null;
+             
+             console.log("Series 0: ", chartData.series[0].data);
+             console.log("Series 1: ", chartData.series[1].data);
+             var plannedVelocityData = chartData.series[2].data;
+             plannedVelocityData[0] = this.config.plannedVelocity;
+             plannedVelocityData[plannedVelocityData.length - 1] = this.config.plannedVelocity;
+             
+             if (chartData.series[3]) {
+                 // set first and last point, and let connectNulls fill in the rest
+                 var seriesData = chartData.series[2].data;
+                 var todoData = chartData.series[0].data;
+//                 console.log("todoData: ", todoData);
+                 seriesData[0] = null;
+                 
+                 var tik = 0;             
+                 while (todoData[++tik] !== null) { 
+ //                    console.log(tik, " : ", todoData[tik]);                 
+                     seriesData[tik] = null;
+                 }
+//                 console.log("tik: ", tik);
+                 seriesData[tik-1] = todoData[tik-1];
+                 
+//                 console.log("ideal data: ", seriesData);
+                 
+                 seriesData[seriesData.length-1] = 0;                 
              }
-             var lastTodoIndex = (todoData.length - 1) - chartData.projections.pointsAddedCount;
-             idealData[lastTodoIndex] = todoData[lastTodoIndex];
-             idealData[dateIndex] = 0;
         },
 
         _indexOfDate: function(chartData, date) {

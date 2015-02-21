@@ -57,25 +57,28 @@
         },
 
         _getRenderData: function() {
-            console.log("Store: ", this.store);
-            console.log("Records: ", this.store.getRange());
             var deferred = Ext.create('Deft.Deferred');
-            var allFeatures = _.filter(this.store.getRange(), function(record){
+            var allFeatures = _.filter(this.store.getRange(), function(record) {
                 return record.get("_type") == "portfolioitem/feature";
             } );            
-            var doneFeatures = _.reduce(allFeatures, function (total, feature){
-                if (feature.get("State") !== null && feature.get("State").get("Name") == "Done") {
-                    return total + 1;
+            console.log("All features: ", allFeatures);
+            var done = 0; 
+            for (var index = 0; index < allFeatures.length; index++) {
+                var state = allFeatures[index].get("State");
+                if (state && state._refObjectName == "Done") {
+                    done++;
                 }
-            }, 0); 
-
-            if ( isNaN(doneFeatures) ) {
-                doneFeatures = 0;
+            }
+            
+            console.log("Done Feature: ", done);
+            
+            if ( isNaN(done) ) {
+                done = 0;
             }
             
              var data = {
-                    estimate: doneFeatures,
-                    percentage: doneFeatures/allFeatures.length,
+                    estimate: done,
+                    percentage: Math.round((done/allFeatures.length) * 100),
                     plannedVelocity: allFeatures.length,
                     unit: ''
                 };

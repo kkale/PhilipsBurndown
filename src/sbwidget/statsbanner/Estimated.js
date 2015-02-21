@@ -2,16 +2,16 @@
     var Ext = window.Ext4 || window.Ext;
 
     /**
-     * shows defects active for timebox
+     * shows accepted work units for timebox
      */
-    Ext.define('Rally.apps.iterationtrackingboard.statsbanner.Defects', {
+    Ext.define('Rally.apps.iterationtrackingboard.statsbanner.Estimated', {
         extend: 'Rally.apps.iterationtrackingboard.statsbanner.Gauge',
-        alias:'widget.statsbannerdefects',
+        alias:'widget.statsbannerestimated',
         requires: ['Rally.util.Colors'],
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Accepted Defects</div>',
+            '<div class="stat-title">Estimated Stories</div>',
             '<div class="stat-metric">',
             '<div class="metric-chart"></div>',
             '<div class="metric-chart-text percent-offset">',
@@ -21,7 +21,7 @@
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<div class="stat-title">Accepted Defects</div>',
+            '<div class="stat-title">Estimated Stories</div>',
             '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
@@ -54,16 +54,16 @@
 
         _getRenderData: function(timeboxData) {
             var data = _.merge(
-                {unit: this._getTimeboxUnits()},
-                this.getDefectAcceptanceData(),
-                timeboxData
-            );
+                    {unit: this._getTimeboxUnits()},
+                    this.getEstimationData(),
+                    timeboxData
+                );
 
-            data.accepted = Ext.util.Format.round(data.accepted, 2);
-            data.total = Ext.util.Format.round(data.total, 2);
-            data.percentage = Math.round((data.accepted / data.total) * 100) || 0;
+                data.accepted = Ext.util.Format.round(data.estimated, 2);
+                data.total = Ext.util.Format.round(data.total, 2);
+                data.percentage = Math.round((data.estimated / data.total) * 100) || 0;
 
-            return data;
+                return data;
         },
 
         _onDataAssembled: function (timeboxData) {

@@ -562,13 +562,53 @@
             };
             var accepted = _.indexOf(scheduleStates, 'Accepted');
             _.each(this.store.getRange(), function (record) {
-                if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
-                    acceptanceData.accepted += 1;
+                if(record.get("_type") == "hierarchicalrequirement") {
+                    acceptanceData.total += 1;                    
+                    if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
+                        acceptanceData.accepted += 1;
+                    }
                 }
-                acceptanceData.total += 1;
             }, this);
             return acceptanceData;
+        },
+        
+        getEstimationData: function () {
+            var estimationData = {
+                    estimated: 0,
+                    total: 0
+                };
+            _.each(this.store.getRange(), function (record) {
+                if (record.get("_type") == "hierarchicalrequirement") {
+                    estimationData.total++;
+                    if (record.get('PlanEstimate')) {
+                        estimationData.estimated++;
+                    }
+                }
+            }, this);
+            console.log("estimationData: ", estimationData);
+            return estimationData;
+        },
+        
+        getDefectAcceptanceData: function () {
+            var scheduleStates = this.store.model.getField('ScheduleState').getAllowedStringValues();
+            var acceptanceData = {
+                accepted: 0,
+                total: 0
+            };
+            var accepted = _.indexOf(scheduleStates, 'Accepted');
+            _.each(this.store.getRange(), function (record) {
+                if(record.get("_type") == "defect") {
+                    acceptanceData.total += 1;                    
+                    if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
+                        acceptanceData.accepted += 1;
+                    }
+                }
+            }, this);
+            console.log("acceptanceData: ", acceptanceData);
+            
+            return acceptanceData;
         }
+        
     });
 })();
                 (function() {
@@ -630,25 +670,28 @@
         },
 
         _getRenderData: function() {
-            console.log("Store: ", this.store);
-            console.log("Records: ", this.store.getRange());
             var deferred = Ext.create('Deft.Deferred');
-            var allFeatures = _.filter(this.store.getRange(), function(record){
+            var allFeatures = _.filter(this.store.getRange(), function(record) {
                 return record.get("_type") == "portfolioitem/feature";
             } );            
-            var doneFeatures = _.reduce(allFeatures, function (total, feature){
-                if (feature.get("State") !== null && feature.get("State").get("Name") == "Done") {
-                    return total + 1;
+            console.log("All features: ", allFeatures);
+            var done = 0; 
+            for (var index = 0; index < allFeatures.length; index++) {
+                var state = allFeatures[index].get("State");
+                if (state && state._refObjectName == "Done") {
+                    done++;
                 }
-            }, 0); 
-
-            if ( isNaN(doneFeatures) ) {
-                doneFeatures = 0;
+            }
+            
+            console.log("Done Feature: ", done);
+            
+            if ( isNaN(done) ) {
+                done = 0;
             }
             
              var data = {
-                    estimate: doneFeatures,
-                    percentage: doneFeatures/allFeatures.length,
+                    estimate: done,
+                    percentage: Math.round((done/allFeatures.length) * 100),
                     plannedVelocity: allFeatures.length,
                     unit: ''
                 };
@@ -796,62 +839,103 @@
      * shows defects active for timebox
      */
     Ext.define('Rally.apps.iterationtrackingboard.statsbanner.Defects', {
-        extend: 'Rally.apps.iterationtrackingboard.statsbanner.BannerWidget',
+        extend: 'Rally.apps.iterationtrackingboard.statsbanner.Gauge',
         alias:'widget.statsbannerdefects',
-        requires: [],
-
-        config: {
-            context: null,
-            store: null,
-            data: {
-                activeCount: 0
-            }
-        },
+        requires: ['Rally.util.Colors'],
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Defects</div>',
+            '<div class="stat-title">Accepted Defects</div>',
             '<div class="stat-metric">',
-            '<div class="metric-icon icon-defect"></div>{activeCount}',
-            '<div class="stat-secondary">Closed</div>',
+            '<div class="metric-chart"></div>',
+            '<div class="metric-chart-text percent-offset">',
+            '{percentage}<div class="metric-percent">%</div>',
+            '</div>',
+            '<div class="metric-subtext">{accepted} of {total}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<span class="metric-icon icon-defect"></span>',
-            '<div class="stat-title">Defects Closed</div>',
-            '<div class="stat-metric">{activeCount}</div>',
+            '<div class="stat-title">Accepted Defects</div>',
+            '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
 
-        initComponent: function() {
-            this.mon(this.store, 'datachanged', this.onDataChanged, this);
-            this.callParent(arguments);
+        config: {
+            data: {
+                percentage: 0,
+                accepted: 0,
+                total: 0,
+                unit: ''
+            }
         },
 
-        onDataChanged: function() {
-            this.update(this._getRenderData());
-            this.fireEvent('ready', this);
+        onDataChanged: function () {
+            this.getTimeboxData().then({
+                success: this._onDataAssembled,
+                scope: this
+            });
         },
 
-        _getActiveDefectCount: function() {
-            var activeDefects = 0;
-            _.each(this.store.getRange(), function(record){
-                var defectSummary = record.get('Summary') && record.get('Summary').Defects;
-                if (defectSummary) {
-                    _.each(defectSummary.State, function(count, state) {
-                        if (state == 'Closed') {
-                            activeDefects += count;
-                        }
-                    }, this);
-                } else if(record.self.typePath === 'defect' && record.get('State') == 'Closed') {
-                    activeDefects++;
+        getChartEl: function() {
+            return this.getEl().down('.metric-chart');
+        },
+
+        _getTimeboxUnits: function() {
+            return this.getContext().getTimeboxScope().getType() === 'iteration' ?
+                    this.getContext().getWorkspace().WorkspaceConfiguration.IterationEstimateUnitName :
+                    this.getContext().getWorkspace().WorkspaceConfiguration.ReleaseEstimateUnitName;
+        },
+
+        _getRenderData: function(timeboxData) {
+            var data = _.merge(
+                {unit: this._getTimeboxUnits()},
+                this.getDefectAcceptanceData(),
+                timeboxData
+            );
+
+            data.accepted = Ext.util.Format.round(data.accepted, 2);
+            data.total = Ext.util.Format.round(data.total, 2);
+            data.percentage = Math.round((data.accepted / data.total) * 100) || 0;
+
+            return data;
+        },
+
+        _onDataAssembled: function (timeboxData) {
+            var renderData = this._getRenderData(timeboxData);
+            this.update(renderData);
+
+            this.refreshChart(this._getChartConfig(renderData));
+        },
+
+        _getChartConfig: function(renderData) {
+            var color = Rally.util.Colors.cyan,
+                daysRemaining = renderData.remaining / renderData.workdays,
+                percentage = renderData.percentage;
+
+            if (percentage === 100) {
+                color = Rally.util.Colors.lime;
+            } else if (daysRemaining === 0) {
+                color = Rally.util.Colors.blue;
+            }
+
+            return {
+                chartData: {
+                    series: [{
+                        data: [
+                            {
+                                name: 'Accepted',
+                                y: percentage,
+                                color: color
+                            },
+                            {
+                                name: '',
+                                y: 100 - percentage,
+                                color: Rally.util.Colors.grey1
+                            }
+                        ]
+                    }]
                 }
-            }, this);
-            return activeDefects;
-        },
-
-        _getRenderData: function() {
-            return {activeCount: this._getActiveDefectCount()};
+            };
         }
     });
 })();
@@ -966,63 +1050,106 @@
     var Ext = window.Ext4 || window.Ext;
 
     /**
-     * shows completed tasks for timebox
+     * shows accepted work units for timebox
      */
-    Ext.define('Rally.apps.iterationtrackingboard.statsbanner.Tasks', {
-        extend: 'Rally.apps.iterationtrackingboard.statsbanner.BannerWidget',
-        alias:'widget.statsbannertasks',
-        requires: [],
-
-        config: {
-            context: null,
-            store: null,
-            data: {
-                count: 0
-            }
-        },
+    Ext.define('Rally.apps.iterationtrackingboard.statsbanner.Estimated', {
+        extend: 'Rally.apps.iterationtrackingboard.statsbanner.Gauge',
+        alias:'widget.statsbannerestimated',
+        requires: ['Rally.util.Colors'],
 
         tpl: [
             '<div class="expanded-widget">',
-            '<div class="stat-title">Tasks</div>',
+            '<div class="stat-title">Estimated Stories</div>',
             '<div class="stat-metric">',
-            '<span class="metric-icon icon-task"></span>{count}',
-            '<div class="stat-secondary">Active</div>',
+            '<div class="metric-chart"></div>',
+            '<div class="metric-chart-text percent-offset">',
+            '{percentage}<div class="metric-percent">%</div>',
+            '</div>',
+            '<div class="metric-subtext">{accepted} of {total}</div>',
             '</div>',
             '</div>',
             '<div class="collapsed-widget">',
-            '<span class="metric-icon icon-task"></span>',
-            '<div class="stat-title">Tasks</div>',
-            '<div class="stat-metric">{count}</div>',
+            '<div class="stat-title">Estimated Stories</div>',
+            '<div class="stat-metric">{percentage}<span class="metric-percent">%</span></div>',
             '</div>'
         ],
 
-        initComponent: function() {
-            this.mon(this.store, 'datachanged', this.onDataChanged, this);
-            this.callParent(arguments);
+        config: {
+            data: {
+                percentage: 0,
+                accepted: 0,
+                total: 0,
+                unit: ''
+            }
         },
 
-        onDataChanged: function() {
-            this.update(this._getRenderData());
-            this.fireEvent('ready', this);
+        onDataChanged: function () {
+            this.getTimeboxData().then({
+                success: this._onDataAssembled,
+                scope: this
+            });
         },
 
-        _getRenderData: function() {
-            return {count: this._getTaskCount()};
+        getChartEl: function() {
+            return this.getEl().down('.metric-chart');
         },
 
-        _getTaskCount: function() {
-            var taskCount = 0;
-            _.each(this.store.getRange(), function(record){
-                var taskSummary = record.get('Summary') && record.get('Summary').Tasks;
-                if (taskSummary) {
-                    _.each(taskSummary['state+blocked'], function(count, state) {
-                        if (!Ext.String.startsWith(state, 'Completed')) {
-                            taskCount += count;
-                        }
-                    }, this);
+        _getTimeboxUnits: function() {
+            return this.getContext().getTimeboxScope().getType() === 'iteration' ?
+                    this.getContext().getWorkspace().WorkspaceConfiguration.IterationEstimateUnitName :
+                    this.getContext().getWorkspace().WorkspaceConfiguration.ReleaseEstimateUnitName;
+        },
+
+        _getRenderData: function(timeboxData) {
+            var data = _.merge(
+                    {unit: this._getTimeboxUnits()},
+                    this.getEstimationData(),
+                    timeboxData
+                );
+
+                data.accepted = Ext.util.Format.round(data.estimated, 2);
+                data.total = Ext.util.Format.round(data.total, 2);
+                data.percentage = Math.round((data.estimated / data.total) * 100) || 0;
+
+                return data;
+        },
+
+        _onDataAssembled: function (timeboxData) {
+            var renderData = this._getRenderData(timeboxData);
+            this.update(renderData);
+
+            this.refreshChart(this._getChartConfig(renderData));
+        },
+
+        _getChartConfig: function(renderData) {
+            var color = Rally.util.Colors.cyan,
+                daysRemaining = renderData.remaining / renderData.workdays,
+                percentage = renderData.percentage;
+
+            if (percentage === 100) {
+                color = Rally.util.Colors.lime;
+            } else if (daysRemaining === 0) {
+                color = Rally.util.Colors.blue;
+            }
+
+            return {
+                chartData: {
+                    series: [{
+                        data: [
+                            {
+                                name: 'Accepted',
+                                y: percentage,
+                                color: color
+                            },
+                            {
+                                name: '',
+                                y: 100 - percentage,
+                                color: Rally.util.Colors.grey1
+                            }
+                        ]
+                    }]
                 }
-            }, this);
-            return taskCount;
+            };
         }
     });
 })();
@@ -1589,7 +1716,7 @@
 
             if (this._storyStates === undefined) {
                 Rally.data.ModelFactory.getModels({
-                    types: ['UserStory', 'Defect', 'DefectSuite', 'TestSet'],
+                    types: ['PortfolioItem/Feature'],
                     context: this.getContext(),
                     scope: this,
                     requester: this,
@@ -1601,18 +1728,14 @@
         },
 
         _createStateMap: function(models) {
-            var stateMap = ['Defined', 'In-Progress', 'Completed'],
+            var stateMap = ['Solution Architecture', 'Solution Design', 'Build & Test', 'Deploy', 'Done'],
                 stateMapIndex = 0,
                 storyStates = {};
-
-            _.each(models.UserStory.getField('ScheduleState').getAllowedStringValues(), function(state) {
-                if (state === stateMap[stateMapIndex + 1]) {
-                    stateMapIndex++;
-                }
-                storyStates[state] = stateMap[stateMapIndex];
+            _.each(stateMap, function(state) {
+                storyStates[state] = state;
             });
-
             this._storyStates = storyStates;
+            console.log("this._storyStates: ", this._storyStates );
             this._loadArtifacts();
         },
 
@@ -2686,7 +2809,7 @@
             'Rally.apps.iterationtrackingboard.statsbanner.TimeboxEnd',
             'Rally.apps.iterationtrackingboard.statsbanner.Defects',
             'Rally.apps.iterationtrackingboard.statsbanner.Accepted',
-            'Rally.apps.iterationtrackingboard.statsbanner.Tasks',
+            'Rally.apps.iterationtrackingboard.statsbanner.Estimated',
             'Rally.apps.iterationtrackingboard.statsbanner.IterationProgress',
             'Rally.apps.iterationtrackingboard.statsbanner.CollapseExpand'
         ],
@@ -2700,11 +2823,10 @@
         width: '100%',
         stateful: true,
         stateEvents: ['expand', 'collapse'],
-        featureStore: undefined,
 
         config: {
             context: null,
-            expanded: false,
+            expanded: true,
             optimizeLayouts: false
         },
 
@@ -2713,7 +2835,7 @@
             {xtype: 'statsbannertimeboxend'},
             {xtype: 'statsbanneraccepted'},
             {xtype: 'statsbannerdefects'},
-            {xtype: 'statsbannertasks'},
+            {xtype: 'statsbannerestimated'},
             {xtype: 'statsbanneriterationprogress', flex: 2},
             {xtype: 'statsbannercollapseexpand', flex: 0}
         ],
@@ -2767,23 +2889,8 @@
                 limit: Infinity,
                 requester: this
             });
-            
-            this.featureStore =  Ext.create('Rally.data.wsapi.artifact.Store', {
-                models: ['PortfolioItem/Feature'],
-                fetch: ['State'],
-                useShallowFetch: true,
-                sorters: [
-                    {property: 'State'}
-                ],
-                filters: [this.context.getTimeboxScope().getQueryFilter()],
-                context: this.context.getDataContext(),
-                limit: Infinity,
-                requester: this
-            }); 
-
             //need to configure the items at the instance level, not the class level (i.e. don't use the 'defaults' config)
             this.items = this._configureItems(this.items);
-//            this.items[0].store = this.featureStore;
 
             this.on('expand', this._onExpand, this);
             this.on('collapse', this._onCollapse, this);
@@ -2876,7 +2983,6 @@
         _update: function () {
             if(this._hasTimebox()) {
                 this.store.load();
-//                this.featureStore.load();
             } else {
                 this._recordLoadEnd();
             }
@@ -2980,12 +3086,11 @@
                     timeZone: "GMT",
                     completedScheduleStateNames: null, // defaults hide problems
                     enableProjections: true,
-                    timebox: null
-
+                    plannedVelocity: 0
                     //chartAggregationType: ''
                 },
 
-                chartColors: ["#005eb8", "#8dc63f", "#666666", "#c0c0c0"],
+                chartColors: ["#005eb8", "#8dc63f", "#F73100", "#c0c0c0","#000000"],
 
                 chartConfig: {
                     chart: {
@@ -3051,8 +3156,7 @@
     Ext.define('Rally.apps.charts.burndown.BurnDownApp', {
         extend: 'Rally.app.TimeboxScopedApp',
 
-        settingsScope: 'project',
-        scopeType: 'release',
+        settingsScope: 'workspace',
 
         requires: [
             'Rally.apps.charts.burndown.BurnDownSettings',
@@ -3092,7 +3196,7 @@
                 showLabels: true,
                 chartAggregationType: undefined,
                 chartDisplayType: undefined,
-                chartTimebox: 'release',
+                chartTimebox: "release",
                 title: ''
             }
         },
@@ -3110,7 +3214,6 @@
         onScopeChange: function (scope) {
             if (!this.ignoreOnScopeChange) {
                 this._rebuildChartForScope(scope.getRecord().get('_ref'));
-
             }
         },
 
@@ -3137,7 +3240,8 @@
             }
         },
 
-        _addStatsBanner: function() {
+
+       _addStatsBanner: function() {
             this.remove('statsBanner');
             this.add({
               xtype: 'statsbanner',
@@ -3149,8 +3253,9 @@
                 scope: this
               }
             });
-        },
-        
+        },        
+
+
         _resizeGridBoardToFillSpace: function() {
             if(this.gridboard) {
               this.gridboard.setHeight(this.getAvailableGridBoardHeight());
@@ -3166,8 +3271,7 @@
             return height;
         },
 
-        
-        
+
         _addHelpComponent: function () {
             this.down('#header').add(this._buildHelpComponent());
         },
@@ -3183,7 +3287,6 @@
 
         _rebuildChartForScope: function(scopeRef) {
             this._destroyChart();
-
             this._saveScopePreference(scopeRef);
             this._loadScopeObject(scopeRef);
             this._addStatsBanner();
@@ -3359,6 +3462,8 @@
             }
             // add scopeEndDate, which may or may not be the same as endDate
             calcConfig.scopeEndDate = this._getScopeObjectEndDate();
+            calcConfig.plannedVelocity = this.scopeObject.PlannedVelocity;
+
         },
 
         _addAggregationTypeToCalculator: function () {
@@ -3874,7 +3979,11 @@
                     'as': 'Scope_max',
                     'f': function(seriesData) {
                             var max = 0, i = 0;
-                            max = seriesData[seriesData.length-1]['To Do'];
+                            for (i=0;i<seriesData.length;i++) {
+                                if(seriesData[i].Accepted + seriesData[i]['To Do'] > max) {
+                                    max = seriesData[i].Accepted + seriesData[i]['To Do'];
+                                }
+                            }
                             return max;
                          }
                 }
@@ -3896,7 +4005,22 @@
                         return Math.floor(100 * (max - index * incrementAmount)) / 100;
                     },
                     "display": "line"
-                }
+                },
+                {
+                    "as": "Prediction",
+                    "f": function (row, index, summaryMetrics, seriesData) {
+                        return null;
+                    },
+                    "display": "line",
+                    "dashStyle": "Dash"
+                },
+                {
+                    "as": "Planned Velocity",
+                    "f": function (row, index, summaryMetrics, seriesData) {
+                        return null;
+                    },
+                    "display": "line"
+                }                
             ];
         },
 
@@ -3907,7 +4031,7 @@
             var timeboxEnd = Ext.Date.add(this.scopeEndDate, Ext.Date.DAY, -1);
             if(this.projectionsConfig === undefined) {
                 this.projectionsConfig = {
-                    doubleTimeboxEnd: timeboxEnd,
+                    doubleTimeboxEnd: doubleTimeboxEnd,
                     timeboxEnd: timeboxEnd,
 
                     series: [
@@ -3923,6 +4047,7 @@
                     }
                 };
             }
+
             return this.projectionsConfig;
         },
 
@@ -3936,36 +4061,52 @@
              return 0;
         },
 
-        _leastSquares: function(todoValues, firstIndex, lastIndex) {
+        _leastSquares: function(doneValues, firstIndex, lastIndex) {
             var n = (lastIndex + 1) - firstIndex;
             var i;
             var sumx = 0.0, sumx2 = 0.0, sumy = 0.0, sumy2 = 0.0, sumxy = 0.0;
             var slope, yintercept;
+            console.log("Total work done: ", doneValues[lastIndex]);
+            console.log("Total days: ", n);
+            console.log("Burndown rate: ", (doneValues[lastIndex]/n));
 
             //Compute sums of x, x^2, y, y^2, and xy
-            for (i = firstIndex; i <= lastIndex; i++) {
-                sumx  = sumx  + i;
-                sumx2 = sumx2 + i * i;
-                sumy  = sumy  + todoValues[i];
-                sumy2 = sumy2 + todoValues[i] * todoValues[i];
-                sumxy = sumxy + i * todoValues[i];
-            }
-            slope = (n * sumxy - sumx * sumy) / (n * sumx2 - sumx * sumx);
-            yintercept = (sumy * sumx2 - sumx * sumxy) / (n * sumx2 - sumx * sumx);
-
+            // for (i = firstIndex; i <= lastIndex; i++) {
+            //     sumx  = sumx  + i;
+            //     sumx2 = sumx2 + i * i;
+            //     sumy  = sumy  + todoValues[i];
+            //     sumy2 = sumy2 + todoValues[i] * todoValues[i];
+            //     sumxy = sumxy + i * todoValues[i];
+            //     console.log("sumx: ", sumx, "sumx2: ", sumx2, "sumy: ", sumy, "sumy2: ", sumy2, "sumxy: ", sumxy, "todoToday: ", todoValues[i]);
+            // }
+            slope = Math.round((doneValues[lastIndex]/n) * -1);
             return {slope: slope, yintercept: yintercept};
         },
 
         runCalculation: function (snapshots) {
             var chartData = this.callParent(arguments);
 
+
+             console.log("todo length: ", chartData.series[0].data.length);
+             console.log("done length: ", chartData.series[1].data.length);
+             console.log("ideal length: ", chartData.series[2].data.length);
+             console.log("categories length: ", chartData.categories.length);
+             this.originalLength = chartData.categories.length;
+
+
+
             if(chartData && chartData.projections && chartData.projections.series[0].slope > 0) {
             // if the slope is positive, try using least squares.  If that's also positive, then use the first result
-                var todoData = chartData.series[0].data;
-                var firstTodoIndex = this._firstNonZero(todoData),
-                    lastTodoIndex = (todoData.length - 1) - chartData.projections.pointsAddedCount;
+                var doneData = chartData.series[1].data;
+                var firstTodoIndex = this._firstNonZero(doneData),
+                    lastTodoIndex = (doneData.length - 1) - chartData.projections.pointsAddedCount;
 
-                var results = this._leastSquares(todoData, firstTodoIndex, lastTodoIndex);
+                var results = this._leastSquares(doneData, firstTodoIndex, lastTodoIndex);
+               // debugger;
+                console.log("Total work left: ", chartData.series[0].data[lastTodoIndex]);
+                console.log("Burndown slope: ", results.slope);
+                console.log("Number of days needed to finish work: ", chartData.series[0].data[lastTodoIndex]/-results.slope);
+
 
                 // override the prediction line only if least squares says the slope isn't positive
                 if(results.slope <= 0) {
@@ -3974,23 +4115,27 @@
                     chartData = this.callParent(arguments);
 
                     // project the plot back to the first todo value
-                    chartData.series[3].data[firstTodoIndex] = ((results.slope * firstTodoIndex) + results.yintercept) + (chartData.series[3].data[lastTodoIndex] - ((results.slope * lastTodoIndex) + results.yintercept));
-                    chartData.series[3].connectNulls = true;
+//                    chartData.series[3].data[firstTodoIndex] = ((results.slope * firstTodoIndex) + results.yintercept) + (chartData.series[3].data[lastTodoIndex] - ((results.slope * lastTodoIndex) + results.yintercept));
+//                    chartData.series[3].connectNulls = true;
                     this.projectionsConfig = undefined;
                 } else {
                 // DE18732, if the slope is up, truncate it at 1.25 of the max Ideal
-//                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
-//                    if (_.max(chartData.series[3].data) > predictionCeiling) {
-//                        var i;
-//                        var maxVal = predictionCeiling;
-//                        for(i=0;i < chartData.series[3].data.length;i++) {
-//                            if(chartData.series[3].data[i] > predictionCeiling) {
-//                                chartData.series[3].data[i] = maxVal;
-//                                maxVal = null;
-//                            }
-//                        }
-//                    }
+                    var predictionCeiling = 1.25 * chartData.series[2].data[0];
+                    if (_.max(chartData.series[3].data) > predictionCeiling) {
+                        var i;
+                        var maxVal = predictionCeiling;
+                        for(i=0;i < chartData.series[3].data.length;i++) {
+                            if(chartData.series[3].data[i] > predictionCeiling) {
+                                chartData.series[3].data[i] = maxVal;
+                                maxVal = null;
+                            }
+                        }
+                    }
                 }
+
+                var plannedVelocity = chartData.series[4].data;
+                plannedVelocity[0] = this.config.plannedVelocity;
+                plannedVelocity[plannedVelocity.length-1] = this.config.plannedVelocity;
 
             }
 
@@ -4009,14 +4154,14 @@
              if(this.workDays.length < 1) {
                 return;
              }
-
              var lastDate = Ext.Date.parse(chartData.categories[chartData.categories.length - 1], 'Y-m-d');
-             console.log("END DAte: ", endDate);
-             console.log("lastDate: ", lastDate);
+
+
+
+
              if(endDate > lastDate) {
                 // the scopeEndDate date wasn't found in the current categories...we need to extend categories to include it
                 // (honoring "workDays").
-                 console.log("last date is earlier, add more dates");
 
                 index = chartData.categories.length;
                 var dt = Ext.Date.add(lastDate, Ext.Date.DAY, 1);
@@ -4032,7 +4177,6 @@
                 index = chartData.categories.length - 1;
              } else {
                  // it is in "scope"...set index to the index of the last workday in scope
-                 console.log("last date is later");
                  index = this._indexOfDate(chartData, endDate);
                  if(index === -1) {
                     // it's in "scope", but falls on a non-workday...back up to the previous workday
@@ -4046,22 +4190,21 @@
                 return;
              }
              // set first and last point, and let connectNulls fill in the rest
-             var seriesData = chartData.series[2].data;
+
+             var dateIndex = this._indexOfDate(chartData, endDate);
+
+
+             console.log("originalLength", this.originalLength);
+             console.log("endDate: ", endDate);
+             console.log("dateIndex: ", dateIndex);
+             var idealData = chartData.series[2].data;
              var todoData = chartData.series[0].data;
-             console.log("todoData: ", todoData);
-             seriesData[0] = null;
-             
-             var tik = 0;             
-             while (todoData[++tik] !== null) { 
-                 console.log(tik, " : ", todoData[tik]);                 
-                 seriesData[tik] = null;
+             for (index = 0; index < dateIndex; index++) {
+                idealData[index] = null;
              }
-             console.log("tik: ", tik);
-             seriesData[tik-1] = todoData[tik-1];
-             
-             console.log("ideal data: ", seriesData);
-             
-             seriesData[seriesData.length-1] = 0;
+             var lastTodoIndex = (todoData.length - 1) - chartData.projections.pointsAddedCount;
+             idealData[lastTodoIndex] = todoData[lastTodoIndex];
+             idealData[dateIndex] = 0;
         },
 
         _indexOfDate: function(chartData, date) {
@@ -4108,23 +4251,13 @@
     </script>
 
 
+
     <style type="text/css">
-        @grey1: #F6F6F6;
-@grey2: #E6E6E6;
-@grey3: #D6D6D6;
-@grey4: #C0C0C0;
-@grey6: #888888;
-@grey7: #666666;
-@grey8: #444444;
-@grey9: #222222;
-@lime: #8DC63F;
-@cyan: #00A9E0;
-@proxima-nova-semi-bold: ProximaNovaSemiBold, Helvetica, Arial;
-@proxima-nova-light: ProximaNovaLight, Helvetica, Arial;
-@proxima-nova: ProximaNova, Helvetica, Arial;
+        
     </style>
+
     <style type="text/css">
-                .stat-panel .collapsed-widget,
+        .stat-panel .collapsed-widget,
 .stat-panel .collapsed-widget > div {
   display: none;
 }
@@ -4344,95 +4477,86 @@
 }
 
     </style>
+
     <style type="text/css">
         .burndown-app .chartControls,
 .app-settings .settings-form .paddedSettingCmp {
-    margin: 15px;
-    border: 0px;
+  margin: 15px;
+  border: 0px;
 }
-
 .burndown-app .chartControls .rui-triggerfield {
-    display: inline-block;
+  display: inline-block;
 }
-
 .burndown-app .chartControls label {
-    display: inline-block;
-    font-size: 1.2em;
-    margin: 3px 8px;
+  display: inline-block;
+  font-size: 1.2em;
+  margin: 3px 8px;
 }
-
 .portfolio-cfd-app,
 .portfolio-burnup-app,
 .burndown-app {
-    margin: 10px;
-    padding-right: 20px;
-    background-color: transparent;
+  margin: 10px;
+  padding-right: 20px;
+  background-color: transparent;
 }
-
 .portfolio-cfd-app .rally-help-icon,
 .burndown-app .rally-help-icon,
 .portfolio-burnup-app .rally-help-icon,
 .chart-app .rally-help-icon {
-    float: right;
+  float: right;
 }
-
 .portfolio-cfd-app .chart,
 .portfolio-burnup-app .chart {
-    min-height: 2em;
+  min-height: 2em;
 }
-
 .app-settings .settings-form .piButton {
-    padding: 5px 15px 7px 15px;
-    z-index: 101;
-    margin-bottom: 10px;
+  padding: 5px 15px 7px 15px;
+  z-index: 101;
+  margin-bottom: 10px;
 }
-
 .app-settings .settings-form .piDisplayField {
-    background-color: #e2eff6;
-    margin-left: -10px;
-    min-width: 250px;
-    padding: 5px 20px 3px 25px;
-    z-index: 100;
-    -webkit-border-radius: 3px;
-    -moz-border-radius: 3px;
-    border-radius: 3px;
+  background-color: #e2eff6;
+  margin-left: -10px;
+  min-width: 250px;
+  padding: 5px 20px 3px 25px;
+  z-index: 100;
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
 }
-
 .app-settings .settings-form .settingsLabel {
-    display: block;
-    font-family: NotoSansBold, Helvetica, Arial;
-    font-weight: normal;
-    min-height: 20px;
-    text-transform: uppercase;
-    width: 100px;
+  display: block;
+  font-family: NotoSansBold, Helvetica, Arial;
+  font-weight: normal;
+  min-height: 20px;
+  text-transform: uppercase;
+  width: 100px;
 }
-
 table.settings-showLabels label {
-    white-space: nowrap;
-    width: auto;
+  white-space: nowrap;
+  width: auto;
 }
 table.settings-showLabels td {
-    width:130px;
+  width: 130px;
 }
-
-.schedule-state-selector .@{prefix}boundlist-selected .@{prefix}form-checkbox {
-    background-position: 0 -13px;
+.schedule-state-selector .x-boundlist-selected .x-form-checkbox {
+  background-position: 0 -13px;
 }
-
 .statefieldvalue-boundlist-item img.stateFieldValue {
-    background: transparent url('checkbox.gif');
-    height: 13px;
-    width: 13px;
+  background: transparent url('checkbox.gif');
+  height: 13px;
+  width: 13px;
 }
-.statefieldvalue-boundlist-selected img.stateFieldValue{
-    background: transparent url('checkbox.gif');
-    height: 13px;
-    width: 13px;
-    background-position-x: 0px;
-    background-position-y: -13px;
+.statefieldvalue-boundlist-selected img.stateFieldValue {
+  background: transparent url('checkbox.gif');
+  height: 13px;
+  width: 13px;
+  background-position-x: 0px;
+  background-position-y: -13px;
 }
 
     </style>
 </head>
-<body></body>
+<body>
+</body>
 </html>

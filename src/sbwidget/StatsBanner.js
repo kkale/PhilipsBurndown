@@ -14,7 +14,7 @@ var bannerme;
             'Rally.apps.iterationtrackingboard.statsbanner.TimeboxEnd',
             'Rally.apps.iterationtrackingboard.statsbanner.Defects',
             'Rally.apps.iterationtrackingboard.statsbanner.Accepted',
-            'Rally.apps.iterationtrackingboard.statsbanner.Tasks',
+            'Rally.apps.iterationtrackingboard.statsbanner.Estimated',
             'Rally.apps.iterationtrackingboard.statsbanner.IterationProgress',
             'Rally.apps.iterationtrackingboard.statsbanner.CollapseExpand'
         ],
@@ -28,11 +28,10 @@ var bannerme;
         width: '100%',
         stateful: true,
         stateEvents: ['expand', 'collapse'],
-        featureStore: undefined,
 
         config: {
             context: null,
-            expanded: false,
+            expanded: true,
             optimizeLayouts: false
         },
 
@@ -41,7 +40,7 @@ var bannerme;
             {xtype: 'statsbannertimeboxend'},
             {xtype: 'statsbanneraccepted'},
             {xtype: 'statsbannerdefects'},
-            {xtype: 'statsbannertasks'},
+            {xtype: 'statsbannerestimated'},
             {xtype: 'statsbanneriterationprogress', flex: 2},
             {xtype: 'statsbannercollapseexpand', flex: 0}
         ],
@@ -95,23 +94,8 @@ var bannerme;
                 limit: Infinity,
                 requester: this
             });
-            
-            this.featureStore =  Ext.create('Rally.data.wsapi.artifact.Store', {
-                models: ['PortfolioItem/Feature'],
-                fetch: ['State'],
-                useShallowFetch: true,
-                sorters: [
-                    {property: 'State'}
-                ],
-                filters: [this.context.getTimeboxScope().getQueryFilter()],
-                context: this.context.getDataContext(),
-                limit: Infinity,
-                requester: this
-            }); 
-
             //need to configure the items at the instance level, not the class level (i.e. don't use the 'defaults' config)
             this.items = this._configureItems(this.items);
-//            this.items[0].store = this.featureStore;
 
             this.on('expand', this._onExpand, this);
             this.on('collapse', this._onCollapse, this);
@@ -204,7 +188,6 @@ var bannerme;
         _update: function () {
             if(this._hasTimebox()) {
                 this.store.load();
-//                this.featureStore.load();
             } else {
                 this._recordLoadEnd();
             }

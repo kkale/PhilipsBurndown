@@ -4,7 +4,8 @@
     Ext.define('Rally.apps.charts.burndown.BurnDownApp', {
         extend: 'Rally.app.TimeboxScopedApp',
 
-        settingsScope: 'workspace',
+        settingsScope: 'project',
+        scopeType: 'release',
 
         requires: [
             'Rally.apps.charts.burndown.BurnDownSettings',
@@ -44,7 +45,7 @@
                 showLabels: true,
                 chartAggregationType: undefined,
                 chartDisplayType: undefined,
-                chartTimebox: "release",
+                chartTimebox: 'release',
                 title: ''
             }
         },
@@ -62,6 +63,7 @@
         onScopeChange: function (scope) {
             if (!this.ignoreOnScopeChange) {
                 this._rebuildChartForScope(scope.getRecord().get('_ref'));
+
             }
         },
 
@@ -77,7 +79,6 @@
 
             Ext.create('Rally.apps.charts.IntegrationHeaders',this).applyTo(this.chartComponentConfig.storeConfig);
 
-            this._addHelpComponent();
             this._loadUserStoryModel();
             this._saveScopeType();
             this.callParent(arguments);
@@ -88,8 +89,7 @@
             }
         },
 
-
-       _addStatsBanner: function() {
+        _addStatsBanner: function() {
             this.remove('statsBanner');
             this.add({
               xtype: 'statsbanner',
@@ -101,9 +101,8 @@
                 scope: this
               }
             });
-        },        
-
-
+        },
+        
         _resizeGridBoardToFillSpace: function() {
             if(this.gridboard) {
               this.gridboard.setHeight(this.getAvailableGridBoardHeight());
@@ -119,7 +118,8 @@
             return height;
         },
 
-
+        
+        
         _addHelpComponent: function () {
             this.down('#header').add(this._buildHelpComponent());
         },
@@ -135,9 +135,11 @@
 
         _rebuildChartForScope: function(scopeRef) {
             this._destroyChart();
+
             this._saveScopePreference(scopeRef);
             this._loadScopeObject(scopeRef);
-            this._addStatsBanner();
+            //this._addStatsBanner();
+            this._addHelpComponent();
         },
 
         _destroyChart: function () {
@@ -309,9 +311,10 @@
                 calcConfig.enableProjections = true;
             }
             // add scopeEndDate, which may or may not be the same as endDate
-            calcConfig.scopeEndDate = this._getScopeObjectEndDate();
+            calcConfig.scopeEndDate = this._getScopeObjectEndDate();            
             calcConfig.plannedVelocity = this.scopeObject.PlannedVelocity;
-
+            console.log("Scope OBject: ", calcConfig.plannedVelocity);
+                        
         },
 
         _addAggregationTypeToCalculator: function () {
@@ -500,6 +503,7 @@
 
             for (i = 0; i < series.length; i++) {
                 if (this._seriesFollowsDisplayType(series[i])) {
+                    console.log("Series: ", series[i]);
                     series[i].type = displayType;
                 }
             }
@@ -560,7 +564,7 @@
 
         _updateChartConfigDateFormat: function () {
             var self = this;
-//comment
+
             this.chartComponentConfig.chartConfig.xAxis.labels.formatter = function () {
                 return self._formatDate(self.dateStringToObject(this.value));
             };

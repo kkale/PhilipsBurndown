@@ -17,7 +17,7 @@
       "../sbwidget/statsbanner/TimeboxEnd.js",
       "../sbwidget/statsbanner/Defects.js",
       "../sbwidget/statsbanner/Accepted.js",
-      "../sbwidget/statsbanner/Tasks.js",
+      "../sbwidget/statsbanner/Estimated.js",
       "../sbwidget/statsbanner/iterationprogresscharts/IterationProgressMixin.js",
       "../sbwidget/statsbanner/iterationprogresscharts/IterationProgressChart.js",
       "../sbwidget/statsbanner/iterationprogresscharts/BurndownChart.js",

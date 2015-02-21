@@ -33,11 +33,12 @@
                     timeZone: "GMT",
                     completedScheduleStateNames: null, // defaults hide problems
                     enableProjections: true,
-                    plannedVelocity: 0
+                    timebox: null,
+                    plannedVelocity: null
                     //chartAggregationType: ''
                 },
 
-                chartColors: ["#005eb8", "#8dc63f", "#F73100", "#c0c0c0","#000000"],
+                chartColors: ["#005eb8", "#8dc63f", "#E00000", "#666666", "#c0c0c0"],
 
                 chartConfig: {
                     chart: {

@@ -181,12 +181,52 @@
             };
             var accepted = _.indexOf(scheduleStates, 'Accepted');
             _.each(this.store.getRange(), function (record) {
-                if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
-                    acceptanceData.accepted += 1;
+                if(record.get("_type") == "hierarchicalrequirement") {
+                    acceptanceData.total += 1;                    
+                    if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
+                        acceptanceData.accepted += 1;
+                    }
                 }
-                acceptanceData.total += 1;
             }, this);
             return acceptanceData;
+        },
+        
+        getEstimationData: function () {
+            var estimationData = {
+                    estimated: 0,
+                    total: 0
+                };
+            _.each(this.store.getRange(), function (record) {
+                if (record.get("_type") == "hierarchicalrequirement") {
+                    estimationData.total++;
+                    if (record.get('PlanEstimate')) {
+                        estimationData.estimated++;
+                    }
+                }
+            }, this);
+            console.log("estimationData: ", estimationData);
+            return estimationData;
+        },
+        
+        getDefectAcceptanceData: function () {
+            var scheduleStates = this.store.model.getField('ScheduleState').getAllowedStringValues();
+            var acceptanceData = {
+                accepted: 0,
+                total: 0
+            };
+            var accepted = _.indexOf(scheduleStates, 'Accepted');
+            _.each(this.store.getRange(), function (record) {
+                if(record.get("_type") == "defect") {
+                    acceptanceData.total += 1;                    
+                    if (_.indexOf(scheduleStates, record.get('ScheduleState')) >= accepted) {
+                        acceptanceData.accepted += 1;
+                    }
+                }
+            }, this);
+            console.log("acceptanceData: ", acceptanceData);
+            
+            return acceptanceData;
         }
+        
     });
 })();

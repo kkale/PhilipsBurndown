@@ -36,14 +36,27 @@
         },
 
         _createStateMap: function(models) {
-            var stateMap = ['Solution Architecture', 'Solution Design', 'Build & Test', 'Deploy', 'Done'],
+            console.log("models: ", models);
+            
+            for (var model in models) {
+                console.log("amodel: ", model);
+            }
+            
+            
+            
+            
+            var stateMap = ['Defined', 'In-Progress', 'Completed'],
                 stateMapIndex = 0,
                 storyStates = {};
-            _.each(stateMap, function(state) {
-                storyStates[state] = state;
+
+            _.each(model[0].getField('State').getAllowedStringValues(), function(state) {
+                if (state === stateMap[stateMapIndex + 1]) {
+                    stateMapIndex++;
+                }
+                storyStates[state] = stateMap[stateMapIndex];
             });
+
             this._storyStates = storyStates;
-            console.log("this._storyStates: ", this._storyStates );
             this._loadArtifacts();
         },
 
